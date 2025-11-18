@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= articulo.title %> - Artículo</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="article-header">
+            <a href="/" class="back-btn">← Volver al listado</a>
+            <h1><%= articulo.title || 'Sin título' %></h1>
+            <div class="article-meta">
+                <span class="date">
+                    📅 <%= new Date(articulo.date).toLocaleDateString('es-ES', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    }) %>
+                </span>
+                <% if (articulo.url) { %>
+                    <a href="<%= articulo.url %>" target="_blank" rel="noopener" class="original-link">
+                        🔗 Ver enlace original
+                    </a>
+                <% } %>
+            </div>
+        </header>
+
+        <div class="article-full">
+            <% if (articulo.tags) { %>
+                <div class="article-tags-full">
+                    <h4>Etiquetas:</h4>
+                    <div class="tags-container-full">
+                        <% 
+                        let tagsArray;
+                        if (typeof articulo.tags === 'string') {
+                            tagsArray = articulo.tags.split(',').map(t => t.trim());
+                        } else if (Array.isArray(articulo.tags)) {
+                            tagsArray = articulo.tags;
+                        } else {
+                            tagsArray = [];
+                        }
+                        %>
+                        <% tagsArray.forEach(tag => { %>
+                            <a href="/?tag=<%= encodeURIComponent(tag) %>" class="tag-article-full">
+                                <%= tag %>
+                            </a>
+                        <% }); %>
+                    </div>
+                </div>
+            <% } %>
+
+            <div class="article-content-full">
+                <p><%= articulo.content %></p>
+            </div>
+
+            <div class="article-actions-full">
+                <a href="/" class="back-home">← Volver al listado</a>
+                <% if (articulo.url) { %>
+                    <a href="<%= articulo.url %>" target="_blank" rel="noopener" class="visit-original">
+                        🌐 Visitar sitio original
+                    </a>
+                <% } %>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Artículos - Panel de Control</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📚 Artículos</h1>
+            <p class="total"><%= totalArticulos %> artículos encontrados</p>
+        </header>
+
+        <!-- CONTADORES DE ACTIVIDAD -->
+        <div class="stats-cards">
+            <div class="stat-card">
+                <div class="stat-icon">📅</div>
+                <div class="stat-content">
+                    <div class="stat-number"><%= stats.hoy %></div>
+                    <div class="stat-label">Hoy</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🕒</div>
+                <div class="stat-content">
+                    <div class="stat-number"><%= stats.ayer %></div>
+                    <div class="stat-label">Ayer</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">📊</div>
+                <div class="stat-content">
+                    <div class="stat-number"><%= stats.estaSemana %></div>
+                    <div class="stat-label">Esta semana</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🗓️</div>
+                <div class="stat-content">
+                    <div class="stat-number"><%= stats.esteMes %></div>
+                    <div class="stat-label">Este mes</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">⏰</div>
+                <div class="stat-content">
+                    <div class="stat-number"><%= stats.semanaPasada %></div>
+                    <div class="stat-label">Semana pasada</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- FILTROS ACTIVOS ARRIBA -->
+        <% if (currentTag || currentCategoria || currentSearch) { %>
+        <div class="active-filters-top">
+            <h3>Filtros aplicados:</h3>
+            <div class="active-filters-container">
+                <% if (currentSearch) { %>
+                    <div class="active-filter-top">
+                        <span class="filter-text">Búsqueda: "<%= currentSearch %>"</span>
+                        <a href="/?<%= 
+                            (currentTag ? 'tag=' + encodeURIComponent(currentTag) : '') + 
+                            (currentCategoria ? (currentTag ? '&' : '') + 'categoria=' + currentCategoria : '')
+                        %>" class="remove-filter-top">×</a>
+                    </div>
+                <% } %>
+                <% if (currentCategoria) { %>
+                    <div class="active-filter-top">
+                        <span class="filter-text">
+                            Categoría: 
+                            <% 
+                            let categoriaNombre = 'Categoría';
+                            categorias.forEach(([key, cat]) => {
+                                if (key === currentCategoria) categoriaNombre = cat.name;
+                            });
+                            %>
+                            <%= categoriaNombre %>
+                        </span>
+                        <a href="/?<%= 
+                            (currentSearch ? 'search=' + encodeURIComponent(currentSearch) : '') + 
+                            (currentTag ? (currentSearch ? '&' : '') + 'tag=' + encodeURIComponent(currentTag) : '')
+                        %>" class="remove-filter-top">×</a>
+                    </div>
+                <% } %>
+                <% if (currentTag) { %>
+                    <div class="active-filter-top">
+                        <span class="filter-text">Etiqueta: <%= currentTag %></span>
+                        <a href="/?<%= 
+                            (currentSearch ? 'search=' + encodeURIComponent(currentSearch) : '') + 
+                            (currentCategoria ? (currentSearch ? '&' : '') + 'categoria=' + currentCategoria : '')
+                        %>" class="remove-filter-top">×</a>
+                    </div>
+                <% } %>
+                <a href="/" class="clear-all-filters">Limpiar todos</a>
+            </div>
+        </div>
+        <% } %>
+
+        <div class="main-layout">
+            <!-- Columna principal -->
+            <div class="content-column">
+                <!-- Barra de búsqueda compacta -->
+                <div class="search-compact">
+                    <form method="GET" action="/" class="search-form">
+                        <div class="search-box">
+                            <input 
+                                type="text" 
+                                name="search" 
+                                placeholder="Buscar artículos..."
+                                value="<%= currentSearch %>"
+                                class="search-input"
+                            >
+                            <button type="submit" class="search-btn">🔍</button>
+                            
+                            <!-- MANTENER los parámetros existentes como hidden inputs -->
+                            <% if (currentTag) { %>
+                                <input type="hidden" name="tag" value="<%= currentTag %>">
+                            <% } %>
+                            <% if (currentCategoria) { %>
+                                <input type="hidden" name="categoria" value="<%= currentCategoria %>">
+                            <% } %>
+                        </div>
+                        
+                        <% if (currentSearch || currentTag || currentCategoria) { %>
+                            <a href="/" class="clear-filter">× Limpiar filtros</a>
+                        <% } %>
+                    </form>
+                </div>
+
+                <!-- Lista de artículos -->
+                <div class="articles-grid">
+                    <% if (articulos.length === 0) { %>
+                        <div class="no-results">
+                            <p>No se encontraron artículos que coincidan con tu búsqueda.</p>
+                        </div>
+                    <% } else { %>
+                        <% articulos.forEach(articulo => { %>
+                            <article class="article-card" data-id="<%= articulo._id %>">
+                                <div class="article-main">
+                                    <div class="article-header">
+                                        <h2 class="article-title">
+                                            <% if (articulo.url) { %>
+                                                <a href="<%= articulo.url %>" target="_blank" rel="noopener">
+                                                    <%= articulo.title || 'Sin título' %>
+                                                </a>
+                                            <% } else { %>
+                                                <%= articulo.title || 'Sin título' %>
+                                            <% } %>
+                                        </h2>
+                                        <span class="article-date">
+                                            <%= new Date(articulo.date).toLocaleDateString('es-ES', {
+                                                year: 'numeric',
+                                                month: 'long',
+                                                day: 'numeric'
+                                            }) %>
+                                        </span>
+                                    </div>
+                                    
+                                    <% if (articulo.tags) { %>
+                                        <div class="article-tags-compact">
+                                            <% 
+                                            let tagsArray;
+                                            if (typeof articulo.tags === 'string') {
+                                                tagsArray = articulo.tags.split(',').map(t => t.trim()).slice(0, 3);
+                                            } else if (Array.isArray(articulo.tags)) {
+                                                tagsArray = articulo.tags.slice(0, 3);
+                                            } else {
+                                                tagsArray = [];
+                                            }
+                                            %>
+                                            <% tagsArray.forEach(tag => { %>
+                                                <span class="tag-small"><%= tag %></span>
+                                            <% }); %>
+                                            <% 
+                                            let totalTags = 0;
+                                            if (typeof articulo.tags === 'string') {
+                                                totalTags = articulo.tags.split(',').length;
+                                            } else if (Array.isArray(articulo.tags)) {
+                                                totalTags = articulo.tags.length;
+                                            }
+                                            %>
+                                            <% if (totalTags > 3) { %>
+                                                <span class="tag-more">+<%= totalTags - 3 %> más</span>
+                                            <% } %>
+                                        </div>
+                                    <% } %>
+
+                                    <% if (articulo.content) { %>
+                                        <div class="article-content-preview">
+                                            <p><%= articulo.content.substring(0, 150) %>...</p>
+                                            <button class="read-more-btn" data-id="<%= articulo._id %>">
+                                                Leer más
+                                            </button>
+                                        </div>
+                                    <% } %>
+                                </div>
+
+                                <div class="article-actions">
+                                    <% if (articulo.url) { %>
+                                        <a href="<%= articulo.url %>" target="_blank" rel="noopener" class="external-link">
+                                            🔗 Enlace
+                                        </a>
+                                    <% } %>
+                                </div>
+                            </article>
+                        <% }); %>
+                    <% } %>
+                </div>
+
+                <!-- PAGINACIÓN ABAJO DEL TODO -->
+                <% if (totalPages > 1) { %>
+                <div class="pagination-container">
+                    <div class="pagination-info">
+                        Mostrando <%= Math.min(itemsPerPage, articulos.length) %> de <%= totalArticulos %> artículos
+                        (Página <%= currentPage %> de <%= totalPages %>)
+                    </div>
+                    
+                    <div class="pagination">
+                        <% if (hasPrevPage) { %>
+                            <a href="/?<%= 
+                                'page=' + (currentPage - 1) +
+                                (currentSearch ? '&search=' + encodeURIComponent(currentSearch) : '') +
+                                (currentTag ? '&tag=' + encodeURIComponent(currentTag) : '') +
+                                (currentCategoria ? '&categoria=' + currentCategoria : '')
+                            %>" class="pagination-btn pagination-prev">← Anterior</a>
+                        <% } %>
+                        
+                        <% for (let i = 1; i <= totalPages; i++) { %>
+                            <% if (i === currentPage) { %>
+                                <span class="pagination-page pagination-current"><%= i %></span>
+                            <% } else if (
+                                i === 1 || 
+                                i === totalPages || 
+                                (i >= currentPage - 2 && i <= currentPage + 2)
+                            ) { %>
+                                <a href="/?<%= 
+                                    'page=' + i +
+                                    (currentSearch ? '&search=' + encodeURIComponent(currentSearch) : '') +
+                                    (currentTag ? '&tag=' + encodeURIComponent(currentTag) : '') +
+                                    (currentCategoria ? '&categoria=' + currentCategoria : '')
+                                %>" class="pagination-page"><%= i %></a>
+                            <% } else if (
+                                i === currentPage - 3 || 
+                                i === currentPage + 3
+                            ) { %>
+                                <span class="pagination-ellipsis">...</span>
+                            <% } %>
+                        <% } %>
+                        
+                        <% if (hasNextPage) { %>
+                            <a href="/?<%= 
+                                'page=' + (currentPage + 1) +
+                                (currentSearch ? '&search=' + encodeURIComponent(currentSearch) : '') +
+                                (currentTag ? '&tag=' + encodeURIComponent(currentTag) : '') +
+                                (currentCategoria ? '&categoria=' + currentCategoria : '')
+                            %>" class="pagination-btn pagination-next">Siguiente →</a>
+                        <% } %>
+                    </div>
+                    
+                    <!-- Selector de página rápida -->
+                    <div class="page-selector">
+                        <label for="pageJump">Ir a página:</label>
+                        <select id="pageJump" onchange="jumpToPage(this.value)">
+                            <% for (let i = 1; i <= totalPages; i++) { %>
+                                <option value="<%= i %>" <%= i === currentPage ? 'selected' : '' %>>
+                                    <%= i %>
+                                </option>
+                            <% } %>
+                        </select>
+                    </div>
+                </div>
+                <% } %>
+            </div>
+
+            <!-- Sidebar de filtros (ETIQUETAS ARRIBA) -->
+            <div class="sidebar">
+                <!-- Filtro por Categorías -->
+                <div class="filters-card">
+                    <h3>📁 Categorías 
+                        <span class="multi-category-hint">(Ctrl+Click para múltiples)</span>
+                    </h3>
+                    <div class="categorias-list">
+                        <% if (categorias && categorias.length > 0) { %>
+                            <% categorias.forEach(([categoriaKey, categoria]) => { %>
+                                <% 
+                                // Determinar si esta categoría está seleccionada
+                                const categoriasSeleccionadas = currentCategoria ? currentCategoria.split(',').map(c => c.trim()) : [];
+                                const estaSeleccionada = categoriasSeleccionadas.includes(categoriaKey);
+                                
+                                // Construir nuevo array de categorías
+                                let nuevasCategorias;
+                                if (estaSeleccionada) {
+                                    // Remover categoría si ya está seleccionada
+                                    nuevasCategorias = categoriasSeleccionadas.filter(c => c !== categoriaKey);
+                                } else {
+                                    // Añadir categoría
+                                    nuevasCategorias = [...categoriasSeleccionadas, categoriaKey];
+                                }
+                                
+                                const nuevoParametroCategoria = nuevasCategorias.join(',');
+                                %>
+                                <a 
+                                    href="/?<%= 
+                                        'categoria=' + nuevoParametroCategoria +
+                                        (currentSearch ? '&search=' + encodeURIComponent(currentSearch) : '') +
+                                        (currentTag ? '&tag=' + encodeURIComponent(currentTag) : '') +
+                                        (currentPage > 1 ? '&page=' + currentPage : '')
+                                    %>" 
+                                    class="categoria-item <%= estaSeleccionada ? 'active' : '' %>"
+                                    data-category="<%= categoriaKey %>"
+                                    onclick="return handleCategoryClick(event, '<%= categoriaKey %>')"
+                                >
+                                    <span class="categoria-name"><%= categoria.name %></span>
+                                    <span class="categoria-count"><%= categoria.count %></span>
+                                    <% if (estaSeleccionada) { %>
+                                        <span class="category-check">✓</span>
+                                    <% } %>
+                                </a>
+                            <% }); %>
+                        <% } else { %>
+                            <p>No hay categorías disponibles</p>
+                        <% } %>
+                    </div>
+                    
+                    <!-- Botón para limpiar selección de categorías -->
+                    <% if (currentCategoria) { %>
+                        <div class="clear-categories">
+                            <a href="/?<%= 
+                                (currentSearch ? 'search=' + encodeURIComponent(currentSearch) : '') +
+                                (currentTag ? '&tag=' + encodeURIComponent(currentTag) : '') +
+                                (currentPage > 1 ? '&page=' + currentPage : '')
+                            %>" class="clear-categories-btn">🗑️ Limpiar categorías</a>
+                        </div>
+                    <% } %>
+                </div>
+
+                <!-- Filtro por Etiquetas Populares -->
+                <div class="filters-card">
+                    <h3>🏷️ Etiquetas Populares 
+                        <span class="total-tags-count">(<%= totalTagsCount %> total)</span>
+                    </h3>
+                    <div class="tags-cloud">
+                        <% if (tags && tags.length > 0) { %>
+                            <% tags.forEach(tag => { %>
+                                <a 
+                                    href="/?<%= 
+                                        'tag=' + encodeURIComponent(tag.name) +
+                                        (currentSearch ? '&search=' + encodeURIComponent(currentSearch) : '') +
+                                        (currentCategoria ? '&categoria=' + currentCategoria : '') +
+                                        (currentPage > 1 ? '&page=' + currentPage : '')
+                                    %>" 
+                                    class="tag-bubble <%= currentTag === tag.name ? 'active' : '' %>"
+                                    data-count="<%= tag.count %>"
+                                    title="Aparece en <%= tag.count %> artículo(s)"
+                                >
+                                    <%= tag.name %>
+                                    <span class="tag-count"><%= tag.count %></span>
+                                </a>
+                            <% }); %>
+                        <% } else { %>
+                            <p>No hay etiquetas disponibles</p>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function handleCategoryClick(event, categoryKey) {
+            if (event.ctrlKey || event.metaKey) {
+                // Permitir comportamiento normal para multi-selección
+                return true;
+            }
+            // Para click simple, podrías manejar diferente
+            event.preventDefault();
+            // Tu lógica aquí...
+            return false;
+        }
+        // Función para saltar a página específica
+        function jumpToPage(page) {
+            const urlParams = new URLSearchParams(window.location.search);
+            urlParams.set('page', page);
+            window.location.href = '/?' + urlParams.toString();
+        }
+
+        
+    </script>
+</body>
+</html>
