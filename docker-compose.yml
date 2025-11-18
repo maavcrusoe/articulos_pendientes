@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  articulos_pendientes:
+    container_name: articulos_pendientes_app
+    build:
+      context: .
+      args:
+        - GITHUB_TOKEN=${GITHUB_TOKEN}
+        - GITHUB_REPO=${GITHUB_REPO}
+    ports:
+      - "3005:3005"
+    environment:
+      - MONGODB_URI=${MONGODB_URI}
+      - DB_NAME=${DB_NAME}
+      - CollectionName=${CollectionName}
+      - ITEMS_PER_PAGE=${ITEMS_PER_PAGE}
+      - PORT=${PORT}
+    env_file:
+      - .env
+    networks:
+      - web
+    restart: always
+
+networks:
+  web:
+    external: true
