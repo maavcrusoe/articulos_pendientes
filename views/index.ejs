@@ -6,7 +6,7 @@
     <title>Artículos - Panel de Control</title>
     <link rel="stylesheet" href="/style.css">
 </head>
-<body>
+<body data-current-page="<%= currentPage %>" data-has-prev="<%= hasPrevPage %>" data-has-next="<%= hasNextPage %>">
     <div class="container">
         <header>
             <h1>📚 Artículos</h1>
@@ -388,5 +388,6 @@
 
         
     </script>
+    <script src="/script.js"></script>
 </body>
 </html>

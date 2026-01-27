@@ -137,6 +137,16 @@ function processTags(tagsArray) {
     };
 }
 
+// Construye un filtro que funcione tanto si los tags son strings como arrays
+function buildTagMatchQuery(value) {
+    return {
+        $or: [
+            { tags: { $regex: value, $options: 'i' } },
+            { tags: { $elemMatch: { $regex: value, $options: 'i' } } }
+        ]
+    };
+}
+
 
 // Añade esta función en tu server.js
 app.use((req, res, next) => {
@@ -213,20 +223,24 @@ app.get('/', async (req, res) => {
             page = 1 
         } = req.query;
         
-        let filter = {};
+        const filterClauses = [];
         const currentPage = parseInt(page);
         const skip = (currentPage - 1) * ITEMS_PER_PAGE;
 
         if (search) {
-            filter.$or = [
-                { title: { $regex: search, $options: 'i' } },
-                { content: { $regex: search, $options: 'i' } },
-                { tags: { $regex: search, $options: 'i' } }
-            ];
+            const tagSearchConditions = buildTagMatchQuery(search).$or;
+            filterClauses.push({
+                $or: [
+                    { title: { $regex: search, $options: 'i' } },
+                    { content: { $regex: search, $options: 'i' } },
+                    { url: { $regex: search, $options: 'i' } },
+                    ...tagSearchConditions
+                ]
+            });
         }
 
         if (tag) {
-            filter.tags = { $regex: tag, $options: 'i' };
+            filterClauses.push({ $or: buildTagMatchQuery(tag).$or });
         }
 
         if (categoria) {
@@ -237,23 +251,17 @@ app.get('/', async (req, res) => {
                 if (CATEGORIAS_TEMATICAS[catKey]) {
                     const categoriaInfo = CATEGORIAS_TEMATICAS[catKey];
                     categoriaInfo.keywords.forEach(keyword => {
-                        categoriaFilters.push({
-                            tags: { $regex: keyword, $options: 'i' }
-                        });
+                        categoriaFilters.push(...buildTagMatchQuery(keyword).$or);
                     });
                 }
             });
             
             if (categoriaFilters.length > 0) {
-                if (!filter.$or) filter.$or = [];
-                filter.$or.push(...categoriaFilters);
-                
-                if (filter.$or.length > 0) {
-                    filter = { $and: [filter] };
-                    filter.$and.push({ $or: categoriaFilters });
-                }
+                filterClauses.push({ $or: categoriaFilters });
             }
         }
+
+        const filter = filterClauses.length > 0 ? { $and: filterClauses } : {};
 
         // Obtener total de artículos para paginación
         const totalArticulos = await db.collection(collectionName)
