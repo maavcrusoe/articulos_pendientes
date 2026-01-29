@@ -21,16 +21,28 @@ const ITEMS_PER_PAGE = parseInt(process.env.ITEMS_PER_PAGE) || 10;
 console.log('MongoDB URL:', mongoUrl);
 
 let db;
+let collection;
 
-// Conectar a MongoDB
+// Conectar a MongoDB y crear índices
 async function connectDB() {
     try {
         const client = new MongoClient(mongoUrl);
         await client.connect();
         db = client.db(dbName);
-        console.log('Conectado a MongoDB');
+        collection = db.collection(collectionName);
+        
+        // Crear índices para búsquedas más rápidas
+        await collection.createIndex({ title: 'text', content: 'text', url: 'text', tags: 'text' });
+        await collection.createIndex({ date: -1 });
+        await collection.createIndex({ tags: 1 });
+        
+        console.log('✅ Conectado a MongoDB e índices creados');
     } catch (error) {
-        console.error('Error conectando a MongoDB:', error);
+        console.error('❌ Error conectando a MongoDB:', error);
+        // No crear índices si ya existen
+        if (error.code !== 85) { // Index already exists
+            throw error;
+        }
     }
 }
 
@@ -127,9 +139,6 @@ function processTags(tagsArray) {
         .map(([name, count]) => ({ name, count }))
         .sort((a, b) => b.count - a.count)
         .slice(0, 25);
-    popularTags.slice(0, 15).forEach(tag => {
-        //console.log(`"${tag.name}": ${tag.count} artículos`);
-    });
 
     return {
         tags: popularTags,
@@ -137,7 +146,42 @@ function processTags(tagsArray) {
     };
 }
 
-// Construye un filtro que funcione tanto si los tags son strings como arrays
+// Función mejorada para búsqueda avanzada por todos los campos
+function buildAdvancedSearchQuery(searchTerm) {
+    if (!searchTerm) return {};
+    
+    // Dividir el término de búsqueda en palabras individuales
+    const words = searchTerm.trim().split(/\s+/).filter(w => w.length > 0);
+    
+    // Si solo hay una palabra, búsqueda simple
+    if (words.length === 1) {
+        const regex = { $regex: searchTerm, $options: 'i' };
+        return {
+            $or: [
+                { title: regex },
+                { content: regex },
+                { url: regex },
+                { tags: regex },
+                { tags: { $elemMatch: { $regex: searchTerm, $options: 'i' } } }
+            ]
+        };
+    }
+    
+    // Para múltiples palabras, buscar que todas aparezcan en cualquier campo
+    const wordConditions = words.map(word => ({
+        $or: [
+            { title: { $regex: word, $options: 'i' } },
+            { content: { $regex: word, $options: 'i' } },
+            { url: { $regex: word, $options: 'i' } },
+            { tags: { $regex: word, $options: 'i' } },
+            { tags: { $elemMatch: { $regex: word, $options: 'i' } } }
+        ]
+    }));
+    
+    return { $and: wordConditions };
+}
+
+// Función para buscar por etiqueta específica
 function buildTagMatchQuery(value) {
     return {
         $or: [
@@ -146,28 +190,6 @@ function buildTagMatchQuery(value) {
         ]
     };
 }
-
-
-// Añade esta función en tu server.js
-app.use((req, res, next) => {
-    res.locals.buildQueryString = (overrides = {}) => {
-        const params = {
-            search: currentSearch,
-            tag: currentTag,
-            categoria: currentCategoria,
-            page: currentPage > 1 ? currentPage : null,
-            ...overrides
-        };
-        
-        const queryString = Object.entries(params)
-            .filter(([key, value]) => value && value !== '')
-            .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
-            .join('&');
-            
-        return queryString ? `?${queryString}` : '';
-    };
-    next();
-});
 
 // Función para calcular estadísticas de artículos por periodo
 async function getArticleStats() {
@@ -188,61 +210,56 @@ async function getArticleStats() {
     const inicioEsteMes = new Date(now.getFullYear(), now.getMonth(), 1);
 
     const stats = {
-        hoy: await db.collection(collectionName).countDocuments({
+        hoy: await collection.countDocuments({
             date: { $gte: hoy.toISOString() }
         }),
-        ayer: await db.collection(collectionName).countDocuments({
+        ayer: await collection.countDocuments({
             date: { 
                 $gte: ayer.toISOString(),
                 $lt: hoy.toISOString()
             }
         }),
-        estaSemana: await db.collection(collectionName).countDocuments({
+        estaSemana: await collection.countDocuments({
             date: { $gte: inicioEstaSemana.toISOString() }
         }),
-        semanaPasada: await db.collection(collectionName).countDocuments({
+        semanaPasada: await collection.countDocuments({
             date: { 
                 $gte: inicioSemanaPasada.toISOString(),
                 $lte: finSemanaPasada.toISOString()
             }
         }),
-        esteMes: await db.collection(collectionName).countDocuments({
+        esteMes: await collection.countDocuments({
             date: { $gte: inicioEsteMes.toISOString() }
+        }),
+        topViews: await collection.countDocuments({
+            views: { $gt: 0 }
         })
     };
 
     return stats;
 }
 
+// Ruta principal optimizada con búsqueda mejorada
 app.get('/', async (req, res) => {
     try {
-        const { 
-            search, 
-            tag, 
-            categoria, 
-            page = 1 
-        } = req.query;
+        const { search, tag, categoria, page = 1, periodo, sort } = req.query;
         
         const filterClauses = [];
         const currentPage = parseInt(page);
         const skip = (currentPage - 1) * ITEMS_PER_PAGE;
 
-        if (search) {
-            const tagSearchConditions = buildTagMatchQuery(search).$or;
-            filterClauses.push({
-                $or: [
-                    { title: { $regex: search, $options: 'i' } },
-                    { content: { $regex: search, $options: 'i' } },
-                    { url: { $regex: search, $options: 'i' } },
-                    ...tagSearchConditions
-                ]
-            });
+        // Búsqueda avanzada por todos los campos
+        if (search && search.trim()) {
+            const searchQuery = buildAdvancedSearchQuery(search.trim());
+            filterClauses.push(searchQuery);
         }
 
-        if (tag) {
-            filterClauses.push({ $or: buildTagMatchQuery(tag).$or });
+        // Filtro por etiqueta específica
+        if (tag && tag.trim()) {
+            filterClauses.push(buildTagMatchQuery(tag.trim()));
         }
 
+        // Filtro por categoría
         if (categoria) {
             const categoriasArray = categoria.split(',').map(cat => cat.trim());
             const categoriaFilters = [];
@@ -261,29 +278,68 @@ app.get('/', async (req, res) => {
             }
         }
 
+        // Filtro por periodo de tiempo
+        if (periodo) {
+            const now = new Date();
+            let fechaInicio, fechaFin;
+
+            switch (periodo) {
+                case 'hoy':
+                    fechaInicio = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    break;
+                case 'ayer':
+                    fechaInicio = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+                    fechaFin = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    break;
+                case 'semana':
+                    fechaInicio = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+                    break;
+                case 'mes':
+                    fechaInicio = new Date(now.getFullYear(), now.getMonth(), 1);
+                    break;
+                case 'semana-pasada':
+                    const inicioEstaSemana = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+                    fechaInicio = new Date(inicioEstaSemana);
+                    fechaInicio.setDate(inicioEstaSemana.getDate() - 7);
+                    fechaFin = new Date(inicioEstaSemana);
+                    break;
+            }
+
+            if (fechaInicio) {
+                const dateFilter = fechaFin 
+                    ? { date: { $gte: fechaInicio.toISOString(), $lt: fechaFin.toISOString() } }
+                    : { date: { $gte: fechaInicio.toISOString() } };
+                filterClauses.push(dateFilter);
+            }
+        }
+
         const filter = filterClauses.length > 0 ? { $and: filterClauses } : {};
 
-        // Obtener total de artículos para paginación
-        const totalArticulos = await db.collection(collectionName)
-            .countDocuments(filter);
+        // Determinar el orden
+        let sortOption = { date: -1 }; // Por defecto, más recientes primero
+        if (sort === 'views') {
+            sortOption = { views: -1, date: -1 }; // Más vistos primero, luego por fecha
+        }
 
-        // Obtener artículos paginados
-        const articulos = await db.collection(collectionName)
-            .find(filter)
-            .sort({ date: -1 })
-            .skip(skip)
-            .limit(ITEMS_PER_PAGE)
-            .toArray();
+        // Consultas optimizadas en paralelo
+        const [totalArticulos, articulos, allArticles] = await Promise.all([
+            collection.countDocuments(filter),
+            collection
+                .find(filter)
+                .sort(sortOption)
+                .skip(skip)
+                .limit(ITEMS_PER_PAGE)
+                .toArray(),
+            collection.find({}, { projection: { tags: 1 } }).toArray()
+        ]);
 
         // Calcular páginas
         const totalPages = Math.ceil(totalArticulos / ITEMS_PER_PAGE);
         const hasNextPage = currentPage < totalPages;
         const hasPrevPage = currentPage > 1;
 
-        // Obtener todos los artículos para procesar tags
-        const allArticles = await db.collection(collectionName).find({}).toArray();
+        // Procesar tags
         const allTags = [];
-
         allArticles.forEach(article => {
             if (article.tags && Array.isArray(article.tags)) {
                 allTags.push(...article.tags);
@@ -292,8 +348,6 @@ app.get('/', async (req, res) => {
 
         const processedTags = processTags(allTags);
         const categoriasAgrupadas = categorizarTags(processedTags.tags);
-
-        // OBTENER ESTADÍSTICAS - dentro de la función async
         const stats = await getArticleStats();
 
         res.render('index', {
@@ -304,6 +358,8 @@ app.get('/', async (req, res) => {
             currentSearch: search || '',
             currentTag: tag || '',
             currentCategoria: categoria || '',
+            currentPeriodo: periodo || '',
+            currentSort: sort || '',
             currentPage: currentPage,
             totalPages: totalPages,
             totalArticulos: totalArticulos,
@@ -314,16 +370,15 @@ app.get('/', async (req, res) => {
             stats: stats
         });
     } catch (error) {
-        console.error('Error obteniendo artículos:', error);
+        console.error('❌ Error obteniendo artículos:', error);
         res.status(500).render('error', { error: 'Error cargando los artículos' });
     }
 });
 
-// Resto del código igual...
+// Ruta para artículo individual
 app.get('/articulo/:id', async (req, res) => {
     try {
-        const articulo = await db.collection(collectionName)
-            .findOne({ _id: new ObjectId(req.params.id) });
+        const articulo = await collection.findOne({ _id: new ObjectId(req.params.id) });
         
         if (!articulo) {
             return res.status(404).render('error', { error: 'Artículo no encontrado' });
@@ -331,11 +386,54 @@ app.get('/articulo/:id', async (req, res) => {
 
         res.render('articulo', { articulo });
     } catch (error) {
-        console.error('Error obteniendo artículo:', error);
+        console.error('❌ Error obteniendo artículo:', error);
         res.status(500).render('error', { error: 'Error cargando el artículo' });
     }
 });
 
+// Ruta para incrementar vistas (llamada desde el botón "Leer más")
+app.post('/api/articulo/:id/view', async (req, res) => {
+    try {
+        const result = await collection.findOneAndUpdate(
+            { _id: new ObjectId(req.params.id) },
+            { $inc: { views: 1 } },
+            { returnDocument: 'after', upsert: false }
+        );
+
+        if (!result) {
+            return res.status(404).json({ error: 'Artículo no encontrado' });
+        }
+
+        res.json({ success: true, views: result.views || 1 });
+    } catch (error) {
+        console.error('❌ Error incrementando vistas:', error);
+        res.status(500).json({ error: 'Error incrementando vistas' });
+    }
+});
+
+// API endpoint para búsqueda rápida (AJAX)
+app.get('/api/search', async (req, res) => {
+    try {
+        const { q } = req.query;
+        
+        if (!q || q.trim().length < 2) {
+            return res.json({ results: [], total: 0 });
+        }
+
+        const searchQuery = buildAdvancedSearchQuery(q.trim());
+        const results = await collection
+            .find(searchQuery)
+            .sort({ date: -1 })
+            .limit(10)
+            .project({ title: 1, url: 1, date: 1, tags: 1 })
+            .toArray();
+
+        res.json({ results, total: results.length });
+    } catch (error) {
+        console.error('❌ Error en búsqueda API:', error);
+        res.status(500).json({ error: 'Error en búsqueda' });
+    }
+});
 
 // Helper function para construir query strings
 function buildQueryString(params) {

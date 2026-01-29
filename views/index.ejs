@@ -15,41 +15,48 @@
 
         <!-- CONTADORES DE ACTIVIDAD -->
         <div class="stats-cards">
-            <div class="stat-card">
+            <a href="/?periodo=hoy<%= currentSearch ? '&search=' + encodeURIComponent(currentSearch) : '' %><%= currentTag ? '&tag=' + encodeURIComponent(currentTag) : '' %><%= currentCategoria ? '&categoria=' + currentCategoria : '' %>" class="stat-card <%= currentPeriodo === 'hoy' ? 'stat-active' : '' %>" title="Ver artículos de hoy">
                 <div class="stat-icon">📅</div>
                 <div class="stat-content">
                     <div class="stat-number"><%= stats.hoy %></div>
                     <div class="stat-label">Hoy</div>
                 </div>
-            </div>
-            <div class="stat-card">
+            </a>
+            <a href="/?periodo=ayer<%= currentSearch ? '&search=' + encodeURIComponent(currentSearch) : '' %><%= currentTag ? '&tag=' + encodeURIComponent(currentTag) : '' %><%= currentCategoria ? '&categoria=' + currentCategoria : '' %>" class="stat-card <%= currentPeriodo === 'ayer' ? 'stat-active' : '' %>" title="Ver artículos de ayer">
                 <div class="stat-icon">🕒</div>
                 <div class="stat-content">
                     <div class="stat-number"><%= stats.ayer %></div>
                     <div class="stat-label">Ayer</div>
                 </div>
-            </div>
-            <div class="stat-card">
+            </a>
+            <a href="/?periodo=semana<%= currentSearch ? '&search=' + encodeURIComponent(currentSearch) : '' %><%= currentTag ? '&tag=' + encodeURIComponent(currentTag) : '' %><%= currentCategoria ? '&categoria=' + currentCategoria : '' %>" class="stat-card <%= currentPeriodo === 'semana' ? 'stat-active' : '' %>" title="Ver artículos de esta semana">
                 <div class="stat-icon">📊</div>
                 <div class="stat-content">
                     <div class="stat-number"><%= stats.estaSemana %></div>
                     <div class="stat-label">Esta semana</div>
                 </div>
-            </div>
-            <div class="stat-card">
+            </a>
+            <a href="/?periodo=mes<%= currentSearch ? '&search=' + encodeURIComponent(currentSearch) : '' %><%= currentTag ? '&tag=' + encodeURIComponent(currentTag) : '' %><%= currentCategoria ? '&categoria=' + currentCategoria : '' %>" class="stat-card <%= currentPeriodo === 'mes' ? 'stat-active' : '' %>" title="Ver artículos de este mes">
                 <div class="stat-icon">🗓️</div>
                 <div class="stat-content">
                     <div class="stat-number"><%= stats.esteMes %></div>
                     <div class="stat-label">Este mes</div>
                 </div>
-            </div>
-            <div class="stat-card">
+            </a>
+            <a href="/?periodo=semana-pasada<%= currentSearch ? '&search=' + encodeURIComponent(currentSearch) : '' %><%= currentTag ? '&tag=' + encodeURIComponent(currentTag) : '' %><%= currentCategoria ? '&categoria=' + currentCategoria : '' %>" class="stat-card <%= currentPeriodo === 'semana-pasada' ? 'stat-active' : '' %>" title="Ver artículos de la semana pasada">
                 <div class="stat-icon">⏰</div>
                 <div class="stat-content">
                     <div class="stat-number"><%= stats.semanaPasada %></div>
                     <div class="stat-label">Semana pasada</div>
                 </div>
-            </div>
+            </a>
+            <a href="/?sort=views<%= currentSearch ? '&search=' + encodeURIComponent(currentSearch) : '' %><%= currentTag ? '&tag=' + encodeURIComponent(currentTag) : '' %><%= currentCategoria ? '&categoria=' + currentCategoria : '' %>" class="stat-card <%= currentSort === 'views' ? 'stat-active' : '' %>" title="Ver artículos más vistos">
+                <div class="stat-icon">🔥</div>
+                <div class="stat-content">
+                    <div class="stat-number"><%= stats.topViews || 0 %></div>
+                    <div class="stat-label">Top Artículos</div>
+                </div>
+            </a>
         </div>
 
         <!-- FILTROS ACTIVOS ARRIBA -->
@@ -108,7 +115,7 @@
                             <input 
                                 type="text" 
                                 name="search" 
-                                placeholder="Buscar artículos..."
+                                placeholder="Buscar en todos los campos (título, contenido, URL, etiquetas)..."
                                 value="<%= currentSearch %>"
                                 class="search-input"
                             >
@@ -121,10 +128,49 @@
                             <% if (currentCategoria) { %>
                                 <input type="hidden" name="categoria" value="<%= currentCategoria %>">
                             <% } %>
+                            <% if (currentPeriodo) { %>
+                                <input type="hidden" name="periodo" value="<%= currentPeriodo %>">
+                            <% } %>
+                            <% if (currentSort) { %>
+                                <input type="hidden" name="sort" value="<%= currentSort %>">
+                            <% } %>
                         </div>
                         
+                        <!-- Indicador de filtros activos debajo del buscador -->
+                        <% if (currentTag || currentCategoria) { %>
+                            <div class="active-filters-inline">
+                                <span class="filter-label">🔖 Filtrando por:</span>
+                                <% if (currentTag) { %>
+                                    <span class="filter-badge">
+                                        <span class="filter-icon">🏷️</span>
+                                        <%= currentTag %>
+                                        <a href="/?<%= 
+                                            (currentSearch ? 'search=' + encodeURIComponent(currentSearch) : '') + 
+                                            (currentCategoria ? (currentSearch ? '&' : '') + 'categoria=' + currentCategoria : '')
+                                        %>" class="filter-remove" title="Quitar filtro">×</a>
+                                    </span>
+                                <% } %>
+                                <% if (currentCategoria) { %>
+                                    <span class="filter-badge">
+                                        <span class="filter-icon">📂</span>
+                                        <% 
+                                        let categoriaNombre = 'Categoría';
+                                        categorias.forEach(([key, cat]) => {
+                                            if (key === currentCategoria) categoriaNombre = cat.name;
+                                        });
+                                        %>
+                                        <%= categoriaNombre %>
+                                        <a href="/?<%= 
+                                            (currentSearch ? 'search=' + encodeURIComponent(currentSearch) : '') + 
+                                            (currentTag ? (currentSearch ? '&' : '') + 'tag=' + encodeURIComponent(currentTag) : '')
+                                        %>" class="filter-remove" title="Quitar filtro">×</a>
+                                    </span>
+                                <% } %>
+                            </div>
+                        <% } %>
+                        
                         <% if (currentSearch || currentTag || currentCategoria) { %>
-                            <a href="/" class="clear-filter">× Limpiar filtros</a>
+                            <a href="/" class="clear-filter">× Limpiar todos los filtros</a>
                         <% } %>
                     </form>
                 </div>
@@ -191,7 +237,7 @@
                                         <div class="article-content-preview">
                                             <p><%= articulo.content.substring(0, 150) %>...</p>
                                             <button class="read-more-btn" data-id="<%= articulo._id %>">
-                                                Leer más
+                                                Leer más <% if (articulo.views && articulo.views > 0) { %><span class="view-count">👁️ <%= articulo.views %></span><% } %>
                                             </button>
                                         </div>
                                     <% } %>
@@ -223,7 +269,9 @@
                                 'page=' + (currentPage - 1) +
                                 (currentSearch ? '&search=' + encodeURIComponent(currentSearch) : '') +
                                 (currentTag ? '&tag=' + encodeURIComponent(currentTag) : '') +
-                                (currentCategoria ? '&categoria=' + currentCategoria : '')
+                                (currentCategoria ? '&categoria=' + currentCategoria : '') +
+                                (currentPeriodo ? '&periodo=' + currentPeriodo : '') +
+                                (currentSort ? '&sort=' + currentSort : '')
                             %>" class="pagination-btn pagination-prev">← Anterior</a>
                         <% } %>
                         
@@ -239,7 +287,9 @@
                                     'page=' + i +
                                     (currentSearch ? '&search=' + encodeURIComponent(currentSearch) : '') +
                                     (currentTag ? '&tag=' + encodeURIComponent(currentTag) : '') +
-                                    (currentCategoria ? '&categoria=' + currentCategoria : '')
+                                    (currentCategoria ? '&categoria=' + currentCategoria : '') +
+                                    (currentPeriodo ? '&periodo=' + currentPeriodo : '') +
+                                    (currentSort ? '&sort=' + currentSort : '')
                                 %>" class="pagination-page"><%= i %></a>
                             <% } else if (
                                 i === currentPage - 3 || 
@@ -254,7 +304,9 @@
                                 'page=' + (currentPage + 1) +
                                 (currentSearch ? '&search=' + encodeURIComponent(currentSearch) : '') +
                                 (currentTag ? '&tag=' + encodeURIComponent(currentTag) : '') +
-                                (currentCategoria ? '&categoria=' + currentCategoria : '')
+                                (currentCategoria ? '&categoria=' + currentCategoria : '') +
+                                (currentPeriodo ? '&periodo=' + currentPeriodo : '') +
+                                (currentSort ? '&sort=' + currentSort : '')
                             %>" class="pagination-btn pagination-next">Siguiente →</a>
                         <% } %>
                     </div>
@@ -368,6 +420,19 @@
         </div>
     </div>
 
+    <footer class="main-footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <span>📚 <strong>Artículos Pendientes</strong> &copy; <%= new Date().getFullYear() %></span>
+            </div>
+            <div class="footer-section">
+                <span>Esta aplicación te permite buscar, filtrar y gestionar artículos pendientes de lectura de forma visual y eficiente.</span>
+            </div>
+            <div class="footer-section">
+                <span>Desarrollado por <strong>Miguel Angel</strong></span>
+            </div>
+        </div>
+    </footer>
     <script>
         function handleCategoryClick(event, categoryKey) {
             if (event.ctrlKey || event.metaKey) {
