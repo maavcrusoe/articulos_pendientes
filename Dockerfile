@@ -24,7 +24,7 @@ RUN rm -rf .git
 RUN npm install --production
 
 # Exponer el puerto
-EXPOSE 3000
+EXPOSE 3005
 
 # Comando para iniciar la aplicación
 CMD ["npm", "start"]

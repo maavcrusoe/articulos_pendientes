@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-    <div class="container admin-shell" data-admin-page="notion-table">
+    <div class="container admin-shell" data-admin-page="notion-table" data-available-tags="<%= encodeURIComponent(JSON.stringify(availableTags || [])) %>">
         <%- include('partials/admin-navbar', { currentAdminSection: 'viewed', user: user }) %>
         <div class="admin-header">
             <div>
@@ -67,11 +67,12 @@
                                 <th class="js-tags-column" data-column-key="tags" data-column-label="Etiquetas">Etiquetas</th>
                                 <th data-column-key="url" data-column-label="URL">URL</th>
                                 <th data-column-key="notion" data-column-label="Notion">Notion</th>
+                                <th data-column-key="action" data-column-label="Acción" data-column-locked="true">Acción</th>
                             </tr>
                         </thead>
                         <tbody>
                             <% notionItems.forEach((item, index) => { %>
-                                <tr>
+                                <tr data-page-id="<%= item.id %>" data-page-title="<%= item.title || 'Sin título' %>" data-current-tags="<%= (item.tags || []).join(', ') %>">
                                     <td data-column-key="index"><%= ((currentPage - 1) * itemsPerPage) + index + 1 %></td>
                                     <td data-column-key="title" title="<%= item.title %>"><%= item.title || 'Sin título' %></td>
                                     <td data-column-key="status"><span class="status-badge status-viewed"><%= item.status || 'Visto' %></span></td>
@@ -95,6 +96,11 @@
                                     </td>
                                     <td data-column-key="notion">
                                         <a href="<%= item.url %>" target="_blank" rel="noopener" class="table-link-btn table-link-btn-secondary">Abrir Notion</a>
+                                    </td>
+                                    <td data-column-key="action">
+                                        <button type="button" class="admin-btn btn-save add-tags-btn" data-page-id="<%= item.id %>" data-page-title="<%= item.title || 'Sin título' %>" data-current-tags="<%= (item.tags || []).join(', ') %>">
+                                            Añadir etiquetas
+                                        </button>
                                     </td>
                                 </tr>
                             <% }); %>
@@ -127,6 +133,61 @@
                     </div>
                 </div>
             <% } %>
+        </div>
+    </div>
+
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner">Actualizando etiquetas en Notion...</div>
+    </div>
+
+    <div class="modal-backdrop" id="notionTagModal" aria-hidden="true">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div>
+                    <span class="admin-eyebrow">Actualizar etiquetas</span>
+                    <h2 id="modalTitle">Añadir etiquetas</h2>
+                </div>
+                <button type="button" class="modal-close" id="closeNotionModal" aria-label="Cerrar">×</button>
+            </div>
+            <p class="modal-copy">Selecciona etiquetas existentes o crea nuevas y las añadiremos a este elemento manteniendo su estado de visto.</p>
+            <div class="modal-section">
+                <span class="modal-helper-title">Etiquetas actuales</span>
+                <div class="selected-tags" id="existingTagsPreview"></div>
+            </div>
+            <div class="modal-section">
+                <label class="admin-field">
+                    <span>Nuevas etiquetas</span>
+                    <input type="text" id="notionTagsInput" placeholder="analytics, youtube, tutorial">
+                </label>
+            </div>
+            <div class="modal-section">
+                <label class="admin-field">
+                    <span>Buscar etiquetas existentes</span>
+                    <input type="text" id="notionTagSearch" list="notionAvailableTags" placeholder="Escribe para filtrar etiquetas disponibles">
+                    <datalist id="notionAvailableTags">
+                        <% availableTags.forEach((tag) => { %>
+                            <option value="<%= tag %>"></option>
+                        <% }); %>
+                    </datalist>
+                </label>
+                <button type="button" class="admin-btn btn-tag-add" id="addSuggestedTagButton">Añadir etiqueta seleccionada</button>
+            </div>
+            <div class="modal-section">
+                <span class="modal-helper-title">Etiquetas a añadir</span>
+                <div class="selected-tags" id="selectedTags"></div>
+            </div>
+            <div class="modal-section">
+                <span class="modal-helper-title">Etiquetas disponibles</span>
+                <div class="tag-suggestion-list" id="tagSuggestionList">
+                    <% availableTags.forEach((tag) => { %>
+                        <button type="button" class="tag-suggestion" data-tag-value="<%= tag %>"><%= tag %></button>
+                    <% }); %>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="admin-btn btn-ghost" id="cancelNotionModal">Cancelar</button>
+                <button type="button" class="admin-btn btn-save" id="confirmAddTagsButton">Guardar etiquetas</button>
+            </div>
         </div>
     </div>
 

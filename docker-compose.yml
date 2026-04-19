@@ -16,6 +16,10 @@ services:
       - CollectionName=${CollectionName}
       - ITEMS_PER_PAGE=${ITEMS_PER_PAGE}
       - PORT=${PORT}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - NOTION_API=${NOTION_API}
+      - NOTION_TABLE=${NOTION_TABLE}
+      - NOTION_DATA_SOURCE_ID=${NOTION_DATA_SOURCE_ID}
     env_file:
       - .env
     networks:

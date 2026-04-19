@@ -11,6 +11,10 @@ document.addEventListener('DOMContentLoaded', function() {
         initNotionPendingPage();
     }
 
+    if (adminPage?.dataset.adminPage === 'notion-table') {
+        initNotionTablePage();
+    }
+
     // Mostrar tooltip informativo si hay filtros activos
     if (searchInput) {
         const hasActiveFilters = document.querySelector('.active-filters-inline');
@@ -530,6 +534,270 @@ function initNotionPendingPage() {
         }
     });
 
+    renderSelectedTags();
+    filterSuggestions();
+}
+
+function initNotionTablePage() {
+    const pageRoot = document.querySelector('[data-admin-page="notion-table"]');
+    const overlay = document.getElementById('loadingOverlay');
+    const modal = document.getElementById('notionTagModal');
+    const closeButton = document.getElementById('closeNotionModal');
+    const cancelButton = document.getElementById('cancelNotionModal');
+    const confirmButton = document.getElementById('confirmAddTagsButton');
+    const titleNode = document.getElementById('modalTitle');
+    const existingTagsNode = document.getElementById('existingTagsPreview');
+    const customTagsInput = document.getElementById('notionTagsInput');
+    const tagSearchInput = document.getElementById('notionTagSearch');
+    const addSuggestedTagButton = document.getElementById('addSuggestedTagButton');
+    const selectedTagsNode = document.getElementById('selectedTags');
+    const tagSuggestionList = document.getElementById('tagSuggestionList');
+    const availableTags = (() => {
+        try {
+            const raw = decodeURIComponent(pageRoot?.dataset.availableTags || '%5B%5D');
+            const parsed = JSON.parse(raw);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch {
+            return [];
+        }
+    })();
+
+    if (!modal || !confirmButton) {
+        return;
+    }
+
+    const state = {
+        pageId: '',
+        title: '',
+        currentTags: [],
+        selectedTags: []
+    };
+
+    const normalizeTag = (value) => String(value || '').trim().toLowerCase();
+
+    const isSystemTag = (value) => {
+        const normalized = normalizeTag(value);
+        return normalized === 'visto'
+            || normalized === 'seen'
+            || normalized === 'read'
+            || normalized === 'done'
+            || normalized === 'completed'
+            || normalized === 'pendiente'
+            || normalized === 'por hacer'
+            || normalized === 'to do'
+            || normalized === 'not started';
+    };
+
+    const uniqueTags = (tags) => Array.from(new Map(
+        tags
+            .map((tag) => String(tag || '').trim())
+            .filter(Boolean)
+            .map((tag) => [normalizeTag(tag), tag])
+    ).values());
+
+    const renderExistingTags = () => {
+        existingTagsNode.innerHTML = '';
+
+        if (!state.currentTags.length) {
+            existingTagsNode.innerHTML = '<span class="muted-text">Este elemento no tiene etiquetas extra todavía.</span>';
+            return;
+        }
+
+        state.currentTags.forEach((tag) => {
+            const pill = document.createElement('span');
+            pill.className = 'selected-tag-pill';
+            pill.textContent = tag;
+            existingTagsNode.appendChild(pill);
+        });
+    };
+
+    const renderSelectedTags = () => {
+        selectedTagsNode.innerHTML = '';
+
+        if (!state.selectedTags.length) {
+            selectedTagsNode.innerHTML = '<span class="muted-text">Todavía no has preparado etiquetas nuevas.</span>';
+            return;
+        }
+
+        state.selectedTags.forEach((tag) => {
+            const pill = document.createElement('span');
+            pill.className = 'selected-tag-pill';
+            pill.textContent = tag;
+
+            const removeButton = document.createElement('button');
+            removeButton.type = 'button';
+            removeButton.className = 'selected-tag-remove';
+            removeButton.textContent = '×';
+            removeButton.setAttribute('aria-label', `Quitar ${tag}`);
+            removeButton.addEventListener('click', () => {
+                state.selectedTags = state.selectedTags.filter((entry) => normalizeTag(entry) !== normalizeTag(tag));
+                renderSelectedTags();
+                filterSuggestions();
+            });
+
+            pill.appendChild(removeButton);
+            selectedTagsNode.appendChild(pill);
+        });
+    };
+
+    const filterSuggestions = () => {
+        const searchValue = normalizeTag(tagSearchInput.value);
+        tagSuggestionList.querySelectorAll('.tag-suggestion').forEach((button) => {
+            const tagValue = button.dataset.tagValue || '';
+            const normalized = normalizeTag(tagValue);
+            const alreadyPresent = state.currentTags.some((tag) => normalizeTag(tag) === normalized)
+                || state.selectedTags.some((tag) => normalizeTag(tag) === normalized)
+                || isSystemTag(tagValue);
+            const matches = !searchValue || normalized.includes(searchValue);
+            button.classList.toggle('is-hidden', !matches || alreadyPresent);
+        });
+    };
+
+    const addTags = (tags) => {
+        const filteredTags = tags.filter((tag) => {
+            const normalized = normalizeTag(tag);
+            return normalized
+                && !isSystemTag(tag)
+                && !state.currentTags.some((entry) => normalizeTag(entry) === normalized)
+                && !state.selectedTags.some((entry) => normalizeTag(entry) === normalized);
+        });
+
+        state.selectedTags = uniqueTags([...state.selectedTags, ...filteredTags]);
+        renderSelectedTags();
+        filterSuggestions();
+    };
+
+    const collectCustomTags = () => {
+        const tags = String(customTagsInput.value || '')
+            .split(',')
+            .map((tag) => tag.trim())
+            .filter(Boolean)
+            .filter((tag) => !isSystemTag(tag));
+
+        customTagsInput.value = '';
+        return tags;
+    };
+
+    const openModal = (button) => {
+        state.pageId = button.dataset.pageId;
+        state.title = button.dataset.pageTitle || 'Sin título';
+        state.currentTags = uniqueTags(
+            String(button.dataset.currentTags || '')
+                .split(',')
+                .map((tag) => tag.trim())
+                .filter((tag) => tag && !isSystemTag(tag))
+        );
+        state.selectedTags = [];
+
+        titleNode.textContent = `Añadir etiquetas: ${state.title}`;
+        customTagsInput.value = '';
+        tagSearchInput.value = '';
+        renderExistingTags();
+        renderSelectedTags();
+        filterSuggestions();
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+        customTagsInput.focus();
+    };
+
+    const closeModal = () => {
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+        state.pageId = '';
+        state.title = '';
+        state.currentTags = [];
+        state.selectedTags = [];
+    };
+
+    document.querySelectorAll('.add-tags-btn').forEach((button) => {
+        button.addEventListener('click', () => openModal(button));
+    });
+
+    tagSuggestionList.querySelectorAll('.tag-suggestion').forEach((button) => {
+        button.addEventListener('click', () => addTags([button.dataset.tagValue]));
+    });
+
+    addSuggestedTagButton?.addEventListener('click', () => {
+        const tag = String(tagSearchInput.value || '').trim();
+        if (!tag || isSystemTag(tag)) {
+            return;
+        }
+
+        addTags([tag]);
+        tagSearchInput.value = '';
+        filterSuggestions();
+    });
+
+    tagSearchInput?.addEventListener('input', filterSuggestions);
+
+    tagSearchInput?.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            addSuggestedTagButton?.click();
+        }
+    });
+
+    customTagsInput?.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            addTags(collectCustomTags());
+        }
+    });
+
+    confirmButton.addEventListener('click', async () => {
+        const customTags = collectCustomTags();
+        if (customTags.length) {
+            addTags(customTags);
+        }
+
+        if (!state.pageId || !state.selectedTags.length) {
+            if (!state.selectedTags.length) {
+                alert('Añade al menos una etiqueta antes de guardar.');
+            }
+            return;
+        }
+
+        overlay?.classList.add('active');
+        confirmButton.disabled = true;
+
+        try {
+            const response = await fetch(`/notion-table/${state.pageId}/tags`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ tags: state.selectedTags })
+            });
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || 'No se pudieron actualizar las etiquetas.');
+            }
+
+            window.location.reload();
+        } catch (error) {
+            alert(error.message || 'Error de conexión');
+            overlay?.classList.remove('active');
+            confirmButton.disabled = false;
+        }
+    });
+
+    closeButton?.addEventListener('click', closeModal);
+    cancelButton?.addEventListener('click', closeModal);
+
+    modal.addEventListener('click', (event) => {
+        if (event.target === modal) {
+            closeModal();
+        }
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && modal.classList.contains('is-open')) {
+            closeModal();
+        }
+    });
+
+    renderExistingTags();
     renderSelectedTags();
     filterSuggestions();
 }
