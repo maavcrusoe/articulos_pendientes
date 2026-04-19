@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notion Pending</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="container admin-shell" data-admin-page="notion-pending" data-available-tags="<%= encodeURIComponent(JSON.stringify(availableTags || [])) %>">
+        <%- include('partials/admin-navbar', { currentAdminSection: 'pending', user: user }) %>
+        <div class="admin-header">
+            <div>
+                <span class="admin-eyebrow">Panel privado</span>
+                <h1>Pendientes de Notion</h1>
+                <p class="admin-subtitle">Solo se muestran los items pendientes. Puedes marcarlos como vistos y enriquecer sus etiquetas antes de guardarlos.</p>
+            </div>
+        </div>
+
+        <% if (error) { %>
+            <div class="admin-alert admin-alert-error"><%= error %></div>
+        <% } %>
+        <% if (success) { %>
+            <div class="admin-alert admin-alert-success"><%= success %></div>
+        <% } %>
+
+        <div class="admin-stats-grid">
+            <div class="admin-stat-card">
+                <span class="admin-stat-value"><%= notionItems.length %></span>
+                <span class="admin-stat-label">Pendientes</span>
+            </div>
+            <div class="admin-stat-card">
+                <span class="admin-stat-value"><%= availableTags.length %></span>
+                <span class="admin-stat-label">Etiquetas disponibles</span>
+            </div>
+        </div>
+
+        <div class="admin-panel notion-panel">
+            <div class="admin-toolbar">
+                <div class="admin-panel-header admin-panel-header-inline">
+                    <div>
+                        <h2>Items pendientes</h2>
+                        <p>Usa el botón de acción para cambiar el estado a visto y añadir etiquetas extra en el mismo flujo.</p>
+                    </div>
+                </div>
+                <div class="table-toolbar-actions">
+                    <button class="admin-btn btn-refresh" id="refreshNotionButton" type="button">Refrescar</button>
+                    <div class="column-picker" data-table-id="notionTable" data-storage-key="notion-pending-columns">
+                        <button class="column-picker-trigger" type="button" aria-label="Filtrar columnas" aria-expanded="false">
+                            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" class="column-picker-icon"><path d="M3 5h18l-7 8v5l-4 2v-7L3 5z"></path></svg>
+                        </button>
+                        <div class="column-picker-menu" hidden></div>
+                    </div>
+                </div>
+            </div>
+            <div class="notion-table-container">
+                <% if (notionItems.length > 0) { %>
+                    <table class="notion-table js-toggleable-tags-table" id="notionTable">
+                        <thead>
+                            <tr>
+                                <th data-column-key="index" data-column-label="#" data-column-locked="true">#</th>
+                                <th data-column-key="title" data-column-label="Título">Título</th>
+                                <th data-column-key="status" data-column-label="Estado">Estado</th>
+                                <th class="js-tags-column" data-column-key="tags" data-column-label="Etiquetas">Etiquetas</th>
+                                <th data-column-key="url" data-column-label="URL">URL</th>
+                                <th data-column-key="notion" data-column-label="Notion">Notion</th>
+                                <th data-column-key="action" data-column-label="Acción" data-column-locked="true">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% notionItems.forEach((item, index) => { %>
+                                <tr data-page-id="<%= item.id %>" data-page-title="<%= item.title || 'Sin título' %>" data-current-tags="<%= (item.tags || []).join(', ') %>">
+                                    <td data-column-key="index"><%= index + 1 %></td>
+                                    <td data-column-key="title" title="<%= item.title %>"><%= item.title || 'Sin título' %></td>
+                                    <td data-column-key="status">
+                                        <span class="status-badge status-pending"><%= item.status || 'Pendiente' %></span>
+                                    </td>
+                                    <td class="js-tags-column" data-column-key="tags">
+                                        <div class="tag-stack">
+                                            <% if (item.tags && item.tags.length) { %>
+                                                <% item.tags.forEach((tag) => { %>
+                                                    <span class="tag-chip"><%= tag %></span>
+                                                <% }); %>
+                                            <% } else { %>
+                                                <span class="muted-text">Sin etiquetas</span>
+                                            <% } %>
+                                        </div>
+                                    </td>
+                                    <td data-column-key="url">
+                                        <% if (item.sourceUrl) { %>
+                                            <a href="<%= item.sourceUrl %>" target="_blank" rel="noopener" class="table-link-btn">Abrir URL</a>
+                                        <% } else { %>
+                                            <span class="muted-text">Sin URL</span>
+                                        <% } %>
+                                    </td>
+                                    <td data-column-key="notion">
+                                        <a href="<%= item.url %>" target="_blank" rel="noopener" class="table-link-btn table-link-btn-secondary">Abrir Notion</a>
+                                    </td>
+                                    <td data-column-key="action">
+                                        <button type="button" class="admin-btn btn-save mark-viewed-btn" data-page-id="<%= item.id %>" data-page-title="<%= item.title || 'Sin título' %>" data-current-tags="<%= (item.tags || []).join(', ') %>">
+                                            Marcar como visto
+                                        </button>
+                                    </td>
+                                </tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                <% } else { %>
+                    <div class="empty-state">
+                        No hay elementos pendientes en este momento.
+                    </div>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner">Cargando datos de Notion...</div>
+    </div>
+
+    <div class="modal-backdrop" id="notionTagModal" aria-hidden="true">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div>
+                    <span class="admin-eyebrow">Actualizar item</span>
+                    <h2 id="modalTitle">Marcar como visto</h2>
+                </div>
+                <button type="button" class="modal-close" id="closeNotionModal" aria-label="Cerrar">×</button>
+            </div>
+            <p class="modal-copy">Antes de guardar, puedes añadir etiquetas extra separadas por comas o seleccionar etiquetas ya disponibles.</p>
+            <div class="modal-section">
+                <label class="admin-field">
+                    <span>Etiquetas personalizadas</span>
+                    <input type="text" id="notionTagsInput" placeholder="analytics, youtube, tutorial">
+                </label>
+            </div>
+            <div class="modal-section">
+                <label class="admin-field">
+                    <span>Buscar etiquetas existentes</span>
+                    <input type="text" id="notionTagSearch" list="notionAvailableTags" placeholder="Escribe para filtrar etiquetas disponibles">
+                    <datalist id="notionAvailableTags">
+                        <% availableTags.forEach((tag) => { %>
+                            <option value="<%= tag %>"></option>
+                        <% }); %>
+                    </datalist>
+                </label>
+                <button type="button" class="admin-btn btn-tag-add" id="addSuggestedTagButton">Añadir etiqueta seleccionada</button>
+            </div>
+            <div class="modal-section">
+                <span class="modal-helper-title">Etiquetas seleccionadas</span>
+                <div class="selected-tags" id="selectedTags"></div>
+            </div>
+            <div class="modal-section">
+                <span class="modal-helper-title">Etiquetas disponibles</span>
+                <div class="tag-suggestion-list" id="tagSuggestionList">
+                    <% availableTags.forEach((tag) => { %>
+                        <button type="button" class="tag-suggestion" data-tag-value="<%= tag %>"><%= tag %></button>
+                    <% }); %>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="admin-btn btn-ghost" id="cancelNotionModal">Cancelar</button>
+                <button type="button" class="admin-btn btn-save" id="confirmMarkViewedButton">Guardar como visto</button>
+            </div>
+        </div>
+    </div>
+    <script src="/script.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+<nav class="admin-navbar">
+    <div class="admin-navbar-brand">
+        <a href="/admin" class="admin-navbar-logo">Panel privado</a>
+        <span class="admin-navbar-caption">Gestión interna</span>
+    </div>
+    <div class="admin-navbar-links">
+        <a href="/admin" class="admin-navbar-link <%= currentAdminSection === 'users' ? 'is-active' : '' %>">Usuarios</a>
+        <a href="/notion-pending" class="admin-navbar-link <%= currentAdminSection === 'pending' ? 'is-active' : '' %>">Pendientes</a>
+        <a href="/notion-table" class="admin-navbar-link <%= currentAdminSection === 'viewed' ? 'is-active' : '' %>">Vistos</a>
+        <a href="/" class="admin-navbar-link">Inicio</a>
+    </div>
+    <div class="admin-navbar-user">
+        <span class="admin-navbar-badge">👤 <%= user.username %></span>
+        <a href="/admin/logout" class="admin-navbar-logout">Cerrar sesión</a>
+    </div>
+</nav>

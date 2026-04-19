@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notion Table</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="container admin-shell" data-admin-page="notion-table">
+        <%- include('partials/admin-navbar', { currentAdminSection: 'viewed', user: user }) %>
+        <div class="admin-header">
+            <div>
+                <span class="admin-eyebrow">Panel privado</span>
+                <h1>Tabla de vistos</h1>
+                <p class="admin-subtitle">Consulta los elementos ya marcados como vistos y busca por título o etiquetas.</p>
+            </div>
+        </div>
+
+        <% if (error) { %>
+            <div class="admin-alert admin-alert-error"><%= error %></div>
+        <% } %>
+        <% if (success) { %>
+            <div class="admin-alert admin-alert-success"><%= success %></div>
+        <% } %>
+
+        <div class="admin-stats-grid">
+            <div class="admin-stat-card">
+                <span class="admin-stat-value"><%= totalItems %></span>
+                <span class="admin-stat-label">Resultados</span>
+            </div>
+            <div class="admin-stat-card">
+                <span class="admin-stat-value"><%= currentPage %>/<%= totalPages %></span>
+                <span class="admin-stat-label">Página</span>
+            </div>
+        </div>
+
+        <div class="admin-panel notion-panel" id="notionTablePage">
+            <div class="admin-toolbar">
+                <form method="GET" action="/notion-table" class="admin-search-form">
+                    <div class="admin-search-box">
+                        <input type="text" name="search" value="<%= currentSearch %>" placeholder="Buscar por título o etiquetas..." class="admin-search-input">
+                        <button type="submit" class="admin-btn btn-save">Buscar</button>
+                    </div>
+                    <% if (currentSearch) { %>
+                        <a href="/notion-table" class="admin-btn btn-ghost">Limpiar</a>
+                    <% } %>
+                </form>
+                <div class="table-toolbar-actions">
+                    <div class="column-picker" data-table-id="viewedNotionTable" data-storage-key="notion-viewed-columns">
+                        <button class="column-picker-trigger" type="button" aria-label="Filtrar columnas" aria-expanded="false">
+                            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" class="column-picker-icon"><path d="M3 5h18l-7 8v5l-4 2v-7L3 5z"></path></svg>
+                        </button>
+                        <div class="column-picker-menu" hidden></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="notion-table-container">
+                <% if (notionItems.length > 0) { %>
+                    <table class="notion-table js-toggleable-tags-table" id="viewedNotionTable">
+                        <thead>
+                            <tr>
+                                <th data-column-key="index" data-column-label="#" data-column-locked="true">#</th>
+                                <th data-column-key="title" data-column-label="Título">Título</th>
+                                <th data-column-key="status" data-column-label="Estado">Estado</th>
+                                <th class="js-tags-column" data-column-key="tags" data-column-label="Etiquetas">Etiquetas</th>
+                                <th data-column-key="url" data-column-label="URL">URL</th>
+                                <th data-column-key="notion" data-column-label="Notion">Notion</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% notionItems.forEach((item, index) => { %>
+                                <tr>
+                                    <td data-column-key="index"><%= ((currentPage - 1) * itemsPerPage) + index + 1 %></td>
+                                    <td data-column-key="title" title="<%= item.title %>"><%= item.title || 'Sin título' %></td>
+                                    <td data-column-key="status"><span class="status-badge status-viewed"><%= item.status || 'Visto' %></span></td>
+                                    <td class="js-tags-column" data-column-key="tags">
+                                        <div class="tag-stack">
+                                            <% if (item.tags && item.tags.length) { %>
+                                                <% item.tags.forEach((tag) => { %>
+                                                    <span class="tag-chip"><%= tag %></span>
+                                                <% }); %>
+                                            <% } else { %>
+                                                <span class="muted-text">Sin etiquetas</span>
+                                            <% } %>
+                                        </div>
+                                    </td>
+                                    <td data-column-key="url">
+                                        <% if (item.sourceUrl) { %>
+                                            <a href="<%= item.sourceUrl %>" target="_blank" rel="noopener" class="table-link-btn">Abrir URL</a>
+                                        <% } else { %>
+                                            <span class="muted-text">Sin URL</span>
+                                        <% } %>
+                                    </td>
+                                    <td data-column-key="notion">
+                                        <a href="<%= item.url %>" target="_blank" rel="noopener" class="table-link-btn table-link-btn-secondary">Abrir Notion</a>
+                                    </td>
+                                </tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                <% } else { %>
+                    <div class="empty-state">No hay resultados para esa búsqueda.</div>
+                <% } %>
+            </div>
+
+            <% if (totalPages > 1) { %>
+                <div class="pagination-container admin-pagination">
+                    <div class="pagination-info">Página <%= currentPage %> de <%= totalPages %>. <%= totalItems %> resultados.</div>
+                    <div class="pagination">
+                        <% if (hasPrevPage) { %>
+                            <a href="/notion-table?page=<%= currentPage - 1 %><%= currentSearch ? '&search=' + encodeURIComponent(currentSearch) : '' %>" class="pagination-btn">Anterior</a>
+                        <% } %>
+                        <% for (let page = 1; page <= totalPages; page++) { %>
+                            <% if (page === currentPage) { %>
+                                <span class="pagination-page pagination-current"><%= page %></span>
+                            <% } else if (page === 1 || page === totalPages || (page >= currentPage - 2 && page <= currentPage + 2)) { %>
+                                <a href="/notion-table?page=<%= page %><%= currentSearch ? '&search=' + encodeURIComponent(currentSearch) : '' %>" class="pagination-page"><%= page %></a>
+                            <% } else if (page === currentPage - 3 || page === currentPage + 3) { %>
+                                <span class="pagination-ellipsis">...</span>
+                            <% } %>
+                        <% } %>
+                        <% if (hasNextPage) { %>
+                            <a href="/notion-table?page=<%= currentPage + 1 %><%= currentSearch ? '&search=' + encodeURIComponent(currentSearch) : '' %>" class="pagination-btn">Siguiente</a>
+                        <% } %>
+                    </div>
+                </div>
+            <% } %>
+        </div>
+    </div>
+
+    <script src="/script.js"></script>
+</body>
+</html>

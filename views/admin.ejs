@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Gestión de Usuarios</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="container admin-shell" data-admin-page="users">
+        <%- include('partials/admin-navbar', { currentAdminSection: 'users', user: user }) %>
+        <div class="admin-header">
+            <div>
+                <span class="admin-eyebrow">Panel privado</span>
+                <h1>Gestión de usuarios</h1>
+                <p class="admin-subtitle">Crea, edita roles y elimina usuarios registrados.</p>
+            </div>
+        </div>
+
+        <% if (error) { %>
+            <div class="admin-alert admin-alert-error"><%= error %></div>
+        <% } %>
+        <% if (success) { %>
+            <div class="admin-alert admin-alert-success"><%= success %></div>
+        <% } %>
+
+        <div class="admin-stats-grid">
+            <div class="admin-stat-card">
+                <span class="admin-stat-value"><%= users.length %></span>
+                <span class="admin-stat-label">Usuarios</span>
+            </div>
+            <div class="admin-stat-card">
+                <span class="admin-stat-value"><%= totalAdmins %></span>
+                <span class="admin-stat-label">Administradores</span>
+            </div>
+        </div>
+
+        <div class="admin-grid">
+            <section class="admin-panel">
+                <div class="admin-panel-header">
+                    <h2>Crear usuario</h2>
+                    <p>Los usuarios creados aquí podrán iniciar sesión de inmediato.</p>
+                </div>
+                <form method="POST" action="/admin/users" class="admin-form admin-create-user-form">
+                    <div class="admin-form-row">
+                        <label class="admin-field">
+                            <span>Usuario</span>
+                            <input type="text" name="username" required>
+                        </label>
+                        <label class="admin-field">
+                            <span>Rol</span>
+                            <select name="role">
+                                <option value="user">Usuario</option>
+                                <option value="admin">Admin</option>
+                            </select>
+                        </label>
+                    </div>
+                    <label class="admin-field">
+                        <span>Contraseña</span>
+                        <input type="password" name="password" minlength="6" required>
+                    </label>
+                    <button type="submit" class="admin-btn btn-save">Crear usuario</button>
+                </form>
+            </section>
+
+            <section class="admin-panel">
+                <div class="admin-panel-header">
+                    <h2>Usuarios registrados</h2>
+                    <p>Edita nombre, rol o contraseña. Si no cambias la contraseña, déjala vacía.</p>
+                </div>
+                <div class="users-list">
+                    <% if (!users.length) { %>
+                        <div class="empty-state">No hay usuarios registrados.</div>
+                    <% } %>
+                    <% users.forEach((managedUser) => { %>
+                        <article class="user-card">
+                            <form method="POST" action="/admin/users/<%= managedUser.id %>/update" class="admin-form user-inline-form">
+                                <div class="user-card-top">
+                                    <div>
+                                        <h3><%= managedUser.username %></h3>
+                                        <p>Creado el <%= new Date(managedUser.createdAt).toLocaleDateString('es-ES') %></p>
+                                    </div>
+                                    <span class="role-pill role-pill-<%= managedUser.role %>"><%= managedUser.role %></span>
+                                </div>
+                                <div class="admin-form-row">
+                                    <label class="admin-field">
+                                        <span>Usuario</span>
+                                        <input type="text" name="username" value="<%= managedUser.username %>" required>
+                                    </label>
+                                    <label class="admin-field">
+                                        <span>Rol</span>
+                                        <select name="role">
+                                            <option value="user" <%= managedUser.role === 'user' ? 'selected' : '' %>>Usuario</option>
+                                            <option value="admin" <%= managedUser.role === 'admin' ? 'selected' : '' %>>Admin</option>
+                                        </select>
+                                    </label>
+                                </div>
+                                <label class="admin-field">
+                                    <span>Nueva contraseña</span>
+                                    <input type="password" name="password" minlength="6" placeholder="Solo si quieres cambiarla">
+                                </label>
+                                <div class="user-card-actions">
+                                    <button type="submit" class="admin-btn btn-save">Guardar cambios</button>
+                                </div>
+                            </form>
+                            <form method="POST" action="/admin/users/<%= managedUser.id %>/delete" class="delete-user-form" onsubmit="return confirm('¿Seguro que quieres eliminar este usuario?');">
+                                <button type="submit" class="admin-btn btn-danger">Eliminar</button>
+                            </form>
+                        </article>
+                    <% }); %>
+                </div>
+            </section>
+        </div>
+    </div>
+</body>
+</html>
