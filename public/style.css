@@ -1301,6 +1301,16 @@ mark {
     color: #1d4ed8;
 }
 
+.table-link-btn.is-last-opened {
+    background: #1d4ed8;
+    color: #fff;
+    box-shadow: 0 10px 22px rgba(29, 78, 216, 0.24);
+}
+
+.notion-table tbody tr.is-link-opened {
+    background: rgba(219, 234, 254, 0.48);
+}
+
 .table-link-btn-secondary {
     background: #f8fafc;
     color: #334155;
@@ -1621,18 +1631,20 @@ mark {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 7px 12px;
     border-radius: 999px;
-    font-size: 13px;
 }
 
 .tag-chip,
 .selected-tag-pill {
+    padding: 7px 12px;
+    font-size: 13px;
     background: #e0e7ff;
     color: #3730a3;
 }
 
 .tag-suggestion {
+    padding: calc(6px + (var(--tag-scale, 1) - 1) * 7px) calc(11px + (var(--tag-scale, 1) - 1) * 10px);
+    font-size: clamp(12px, calc(12px + (var(--tag-scale, 1) - 1) * 8px), 18px);
     border: 1px solid #cbd5e1;
     background: #fff;
     color: #334155;

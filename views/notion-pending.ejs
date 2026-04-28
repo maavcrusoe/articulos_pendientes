@@ -24,13 +24,29 @@
             <div class="admin-alert admin-alert-success"><%= success %></div>
         <% } %>
 
+        <%
+            const systemTagNames = ['visto', 'seen', 'read', 'done', 'completed', 'pendiente', 'por hacer', 'to do', 'not started'];
+            const normalizeTagName = (tag) => String(tag || '').trim().toLowerCase();
+            const isSystemTag = (tag) => systemTagNames.includes(normalizeTagName(tag));
+            const visibleAvailableTags = (availableTags || []).filter((tag, index, list) => {
+                const normalized = normalizeTagName(tag);
+                return normalized && !isSystemTag(tag)
+                    && list.findIndex((entry) => normalizeTagName(entry) === normalized) === index;
+            });
+            const pendingTagCounts = visibleAvailableTags.map((tag) => ({
+                tag,
+                count: (notionItems || []).reduce((total, item) => total + (item.tags || []).filter((entry) => normalizeTagName(entry) === normalizeTagName(tag)).length, 0)
+            }));
+            const maxPendingTagCount = pendingTagCounts.reduce((max, entry) => Math.max(max, entry.count), 1);
+        %>
+
         <div class="admin-stats-grid">
             <div class="admin-stat-card">
                 <span class="admin-stat-value"><%= notionItems.length %></span>
                 <span class="admin-stat-label">Pendientes</span>
             </div>
             <div class="admin-stat-card">
-                <span class="admin-stat-value"><%= availableTags.length %></span>
+                <span class="admin-stat-value"><%= pendingTagCounts.length %></span>
                 <span class="admin-stat-label">Etiquetas disponibles</span>
             </div>
         </div>
@@ -69,6 +85,7 @@
                         </thead>
                         <tbody>
                             <% notionItems.forEach((item, index) => { %>
+                                <% const visibleItemTags = (item.tags || []).filter((tag) => !isSystemTag(tag)); %>
                                 <tr data-page-id="<%= item.id %>" data-page-title="<%= item.title || 'Sin título' %>" data-current-tags="<%= (item.tags || []).join(', ') %>">
                                     <td data-column-key="index"><%= index + 1 %></td>
                                     <td data-column-key="title" title="<%= item.title %>"><%= item.title || 'Sin título' %></td>
@@ -77,8 +94,8 @@
                                     </td>
                                     <td class="js-tags-column" data-column-key="tags">
                                         <div class="tag-stack">
-                                            <% if (item.tags && item.tags.length) { %>
-                                                <% item.tags.forEach((tag) => { %>
+                                            <% if (visibleItemTags.length) { %>
+                                                <% visibleItemTags.forEach((tag) => { %>
                                                     <span class="tag-chip"><%= tag %></span>
                                                 <% }); %>
                                             <% } else { %>
@@ -130,21 +147,14 @@
             <p class="modal-copy">Antes de guardar, puedes añadir etiquetas extra separadas por comas o seleccionar etiquetas ya disponibles.</p>
             <div class="modal-section">
                 <label class="admin-field">
-                    <span>Etiquetas personalizadas</span>
-                    <input type="text" id="notionTagsInput" placeholder="analytics, youtube, tutorial">
-                </label>
-            </div>
-            <div class="modal-section">
-                <label class="admin-field">
-                    <span>Buscar etiquetas existentes</span>
-                    <input type="text" id="notionTagSearch" list="notionAvailableTags" placeholder="Escribe para filtrar etiquetas disponibles">
+                    <span>Etiquetas</span>
+                    <input type="text" id="notionTagsInput" list="notionAvailableTags" placeholder="Escribe etiquetas separadas por comas o filtra las disponibles">
                     <datalist id="notionAvailableTags">
-                        <% availableTags.forEach((tag) => { %>
+                        <% visibleAvailableTags.forEach((tag) => { %>
                             <option value="<%= tag %>"></option>
                         <% }); %>
                     </datalist>
                 </label>
-                <button type="button" class="admin-btn btn-tag-add" id="addSuggestedTagButton">Añadir etiqueta seleccionada</button>
             </div>
             <div class="modal-section">
                 <span class="modal-helper-title">Etiquetas seleccionadas</span>
@@ -153,8 +163,8 @@
             <div class="modal-section">
                 <span class="modal-helper-title">Etiquetas disponibles</span>
                 <div class="tag-suggestion-list" id="tagSuggestionList">
-                    <% availableTags.forEach((tag) => { %>
-                        <button type="button" class="tag-suggestion" data-tag-value="<%= tag %>"><%= tag %></button>
+                    <% pendingTagCounts.forEach(({ tag, count }) => { %>
+                        <button type="button" class="tag-suggestion" data-tag-value="<%= tag %>" data-tag-count="<%= count %>" style="--tag-scale: <%= (0.85 + ((count || 1) / maxPendingTagCount) * 0.55).toFixed(2) %>" title="Usada <%= count %> veces en pendientes"><%= tag %></button>
                     <% }); %>
                 </div>
             </div>

@@ -324,8 +324,6 @@ function initNotionPendingPage() {
     const confirmButton = document.getElementById('confirmMarkViewedButton');
     const titleNode = document.getElementById('modalTitle');
     const customTagsInput = document.getElementById('notionTagsInput');
-    const tagSearchInput = document.getElementById('notionTagSearch');
-    const addSuggestedTagButton = document.getElementById('addSuggestedTagButton');
     const selectedTagsNode = document.getElementById('selectedTags');
     const tagSuggestionList = document.getElementById('tagSuggestionList');
     const availableTags = (() => {
@@ -349,6 +347,19 @@ function initNotionPendingPage() {
     };
 
     const normalizeTag = (value) => String(value || '').trim().toLowerCase();
+
+    const isSystemTag = (value) => {
+        const normalized = normalizeTag(value);
+        return normalized === 'visto'
+            || normalized === 'seen'
+            || normalized === 'read'
+            || normalized === 'done'
+            || normalized === 'completed'
+            || normalized === 'pendiente'
+            || normalized === 'por hacer'
+            || normalized === 'to do'
+            || normalized === 'not started';
+    };
 
     const uniqueTags = (tags) => Array.from(new Map(
         tags
@@ -378,6 +389,7 @@ function initNotionPendingPage() {
             removeButton.addEventListener('click', () => {
                 state.selectedTags = state.selectedTags.filter((entry) => normalizeTag(entry) !== normalizeTag(tag));
                 renderSelectedTags();
+                filterSuggestions();
             });
 
             pill.appendChild(removeButton);
@@ -386,16 +398,26 @@ function initNotionPendingPage() {
     };
 
     const filterSuggestions = () => {
-        const searchValue = normalizeTag(tagSearchInput.value);
+        const searchValue = normalizeTag(customTagsInput?.value);
         tagSuggestionList.querySelectorAll('.tag-suggestion').forEach((button) => {
-            const matches = !searchValue || normalizeTag(button.dataset.tagValue).includes(searchValue);
-            button.classList.toggle('is-hidden', !matches);
+            const tagValue = button.dataset.tagValue || '';
+            const normalized = normalizeTag(tagValue);
+            const alreadySelected = state.selectedTags.some((tag) => normalizeTag(tag) === normalized);
+            const matches = !searchValue || normalized.includes(searchValue);
+            button.classList.toggle('is-hidden', !matches || alreadySelected || isSystemTag(tagValue));
         });
     };
 
     const addTags = (tags) => {
-        state.selectedTags = uniqueTags([...state.selectedTags, ...tags]);
+        const filteredTags = tags.filter((tag) => {
+            const normalized = normalizeTag(tag);
+            return normalized && !isSystemTag(tag)
+                && !state.selectedTags.some((entry) => normalizeTag(entry) === normalized);
+        });
+
+        state.selectedTags = uniqueTags([...state.selectedTags, ...filteredTags]);
         renderSelectedTags();
+        filterSuggestions();
     };
 
     const collectCustomTags = () => {
@@ -415,11 +437,10 @@ function initNotionPendingPage() {
             String(button.dataset.currentTags || '')
                 .split(',')
                 .map((tag) => tag.trim())
-                .filter((tag) => tag && normalizeTag(tag) !== 'pendiente')
+                .filter((tag) => tag && !isSystemTag(tag))
         );
         titleNode.textContent = `Marcar como visto: ${state.title}`;
         customTagsInput.value = '';
-        tagSearchInput.value = '';
         renderSelectedTags();
         filterSuggestions();
         modal.classList.add('is-open');
@@ -439,28 +460,29 @@ function initNotionPendingPage() {
         button.addEventListener('click', () => openModal(button));
     });
 
+    document.querySelectorAll('#notionTable .table-link-btn').forEach((link) => {
+        link.addEventListener('click', () => {
+            document.querySelectorAll('#notionTable .table-link-btn.is-last-opened').forEach((entry) => {
+                entry.classList.remove('is-last-opened');
+            });
+            document.querySelectorAll('#notionTable tr.is-link-opened').forEach((row) => {
+                row.classList.remove('is-link-opened');
+            });
+
+            link.classList.add('is-last-opened');
+            link.closest('tr')?.classList.add('is-link-opened');
+        });
+    });
+
     tagSuggestionList.querySelectorAll('.tag-suggestion').forEach((button) => {
-        button.addEventListener('click', () => addTags([button.dataset.tagValue]));
+        button.addEventListener('click', () => {
+            addTags([button.dataset.tagValue]);
+            customTagsInput.value = '';
+            filterSuggestions();
+        });
     });
 
-    addSuggestedTagButton?.addEventListener('click', () => {
-        const tag = String(tagSearchInput.value || '').trim();
-        if (!tag) {
-            return;
-        }
-        addTags([tag]);
-        tagSearchInput.value = '';
-        filterSuggestions();
-    });
-
-    tagSearchInput?.addEventListener('input', filterSuggestions);
-
-    tagSearchInput?.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter') {
-            event.preventDefault();
-            addSuggestedTagButton?.click();
-        }
-    });
+    customTagsInput?.addEventListener('input', filterSuggestions);
 
     customTagsInput?.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') {
