@@ -9,6 +9,9 @@ require('dotenv').config();
 
 const { connectDB, getUsersCollection } = require('./src/db');
 const { buildQueryString } = require('./src/utils');
+const { initScheduler, getTaskRegistry } = require('./src/tasks/scheduler');
+const pkg = require('./package.json');
+const { appLogger } = require('./src/logger');
 
 // Rutas
 const articlesRoutes = require('./src/routes/articles');
@@ -86,6 +89,7 @@ app.use((req, res) => {
 // Error handler global
 app.use((err, req, res, _next) => {
     console.error('❌ Error no controlado:', err);
+    appLogger.error(`Error no controlado: ${err.message} — ${err.stack || ''}`);
     res.status(500).render('error', { error: 'Error interno del servidor' });
 });
 
@@ -109,10 +113,32 @@ connectDB().then(async () => {
         console.error('⚠️ Error creando usuario admin:', e.message);
     }
 
+    initScheduler();
+
     app.listen(port, () => {
-        console.log(`🚀 Servidor corriendo en http://localhost:${port}`);
+        // Pretty startup block (single URL print, useful metadata)
+        const name = pkg.name || 'app';
+        const version = pkg.version || 'dev';
+        const env = process.env.NODE_ENV || 'development';
+        const tasks = typeof getTaskRegistry === 'function' ? (getTaskRegistry().length || 0) : 0;
+        const sessionConfigured = !!process.env.SESSION_SECRET;
+
+        const line = (text = '') => console.log(`│ ${text}`);
+        const hr = '-'.repeat(56);
+
+        console.log('\n' + '='.repeat(60));
+        console.log(` 🚀  ${name} — startup`);
+        console.log(hr);
+        line(`version : ${version}`);
+        line(`env     : ${env}`);
+        line(`port    : ${port}`);
+        line(`url     : http://localhost:${port}  🚀`);
+        line(`tasks   : ${tasks} registered`);
+        line(`session : ${sessionConfigured ? '✅ SESSION_SECRET configured' : '⚠️ SESSION_SECRET NOT set (using temporary secret)'} `);
+        console.log('='.repeat(60) + '\n');
     });
 }).catch((err) => {
     console.error('❌ No se pudo arrancar la aplicación:', err);
+    appLogger.error(`Fallo al arrancar: ${err.message}`);
     process.exit(1);
 });

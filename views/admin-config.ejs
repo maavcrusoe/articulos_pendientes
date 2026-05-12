@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin — Configuración LLM</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .config-form { max-width: 720px; }
+        .config-field { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1.25rem; }
+        .config-field label { font-weight: 600; font-size: 0.9rem; }
+        .config-field input[type="text"],
+        .config-field textarea {
+            padding: 0.55rem 0.75rem;
+            border: 1px solid var(--border, #e5e7eb);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-family: inherit;
+            background: var(--surface, #fff);
+            color: var(--text, #111);
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .config-field textarea {
+            min-height: 220px;
+            resize: vertical;
+            line-height: 1.55;
+        }
+        .config-hint { font-size: 0.8rem; color: var(--text-muted, #6b7280); margin-top: 0.2rem; }
+        .config-actions { display: flex; gap: 0.75rem; margin-top: 1.5rem; }
+        .llm-info-box {
+            background: var(--surface-alt, #f8f9fa);
+            border: 1px solid var(--border, #e5e7eb);
+            border-radius: 8px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.5rem;
+            font-size: 0.875rem;
+        }
+        .llm-info-box strong { display: block; margin-bottom: 0.4rem; }
+        .llm-info-box code {
+            background: var(--code-bg, #f1f5f9);
+            padding: 0.1rem 0.35rem;
+            border-radius: 4px;
+            font-size: 0.82rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container admin-shell" data-admin-page="config">
+        <%- include('partials/admin-navbar', { currentAdminSection: 'config', user: user }) %>
+        <div class="admin-header">
+            <div>
+                <span class="admin-eyebrow">Panel privado</span>
+                <h1>Configuración LLM</h1>
+                <p class="admin-subtitle">Ajusta el modelo y el prompt usados en la tarea de scraping y análisis automático.</p>
+            </div>
+        </div>
+
+        <% if (error) { %>
+            <div class="admin-alert admin-alert-error"><%= error %></div>
+        <% } %>
+        <% if (success) { %>
+            <div class="admin-alert admin-alert-success"><%= success %></div>
+        <% } %>
+
+        <div class="admin-panel">
+            <div class="admin-panel-header">
+                <h2>Configuración activa</h2>
+            </div>
+
+            <div class="llm-info-box">
+                <strong>API LLM configurada</strong>
+                Endpoint: <code><%= process.env.LLM_API_URL || 'http://192.168.100.6:11434/api/chat' %></code>
+                — configurable en <code>.env</code> con la variable <code>LLM_API_URL</code>.
+                El prompt se guarda en <code>prompt/config.json</code>.
+            </div>
+
+            <form method="POST" action="/admin/config" class="config-form">
+                <div class="config-field">
+                    <label for="cfgModel">Modelo</label>
+                    <input type="text" id="cfgModel" name="model" value="<%= config.model %>" placeholder="llama3.2" required>
+                    <span class="config-hint">Nombre exacto del modelo en Ollama, p.ej. <strong>llama3.2</strong>, <strong>mistral</strong>, <strong>gemma3:12b</strong>.</span>
+                </div>
+
+                <div class="config-field">
+                    <label for="cfgPrompt">Prompt de sistema</label>
+                    <textarea id="cfgPrompt" name="prompt" placeholder="Escribe aquí el prompt que se enviará al LLM junto con el contenido de cada artículo..."><%= config.prompt %></textarea>
+                    <span class="config-hint">El texto extraído del artículo se añade directamente al final del prompt. Usa instrucciones claras para obtener mejores resúmenes.</span>
+                </div>
+
+                <div class="config-actions">
+                    <button type="submit" class="admin-btn btn-save">Guardar configuración</button>
+                    <a href="/admin/tasks" class="admin-btn btn-ghost">Ver tareas</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/script.js"></script>
+</body>
+</html>

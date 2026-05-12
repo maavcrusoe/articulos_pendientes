@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin — Tareas programadas</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .task-list { display: flex; flex-direction: column; gap: 1rem; }
+        .task-card {
+            border: 1px solid var(--border, #e5e7eb);
+            border-radius: 8px;
+            padding: 1.25rem 1.5rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 1.5rem;
+            background: var(--surface, #fff);
+        }
+        .task-card-info { flex: 1; min-width: 0; }
+        .task-card-info h3 { margin: 0 0 0.25rem; font-size: 1rem; }
+        .task-card-info p  { margin: 0 0 0.5rem; font-size: 0.875rem; color: var(--text-muted, #6b7280); }
+        .task-meta { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; font-size: 0.8rem; color: var(--text-muted, #6b7280); margin-top: 0.5rem; }
+        .task-meta strong { color: var(--text, #111); }
+        .task-status-ok    { color: #16a34a; font-weight: 600; }
+        .task-status-error { color: #dc2626; font-weight: 600; }
+        .task-status-running { color: #f59e0b; font-weight: 600; }
+        .task-card-action { flex-shrink: 0; }
+        .task-card-shell { display: flex; flex-direction: column; gap: 1rem; width: 100%; }
+        .task-result-panel {
+            border-top: 1px solid var(--border, #e5e7eb);
+            padding-top: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.9rem;
+        }
+        .task-result-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 0.75rem;
+        }
+        .task-result-stat {
+            padding: 0.9rem 1rem;
+            border-radius: 10px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+        }
+        .task-result-stat strong { display: block; font-size: 1.15rem; color: #0f172a; }
+        .task-result-stat span { font-size: 0.78rem; color: #64748b; }
+        .task-inline-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+        .duplicate-groups-form { display: flex; flex-direction: column; gap: 0.85rem; }
+        .duplicate-group-list { display: flex; flex-direction: column; gap: 0.75rem; max-height: 420px; overflow: auto; }
+        .duplicate-group {
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 0.9rem 1rem;
+            background: #fff;
+        }
+        .duplicate-group-header { display: flex; gap: 0.75rem; align-items: flex-start; }
+        .duplicate-group-header input { margin-top: 0.25rem; }
+        .duplicate-group-body { display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; }
+        .duplicate-url { font-weight: 700; color: #1d4ed8; word-break: break-all; }
+        .duplicate-note { color: #64748b; font-size: 0.85rem; }
+        .duplicate-item-list { margin: 0; padding-left: 1.1rem; color: #475569; font-size: 0.88rem; }
+        .task-json-preview {
+            margin: 0;
+            padding: 1rem;
+            border-radius: 12px;
+            background: #0f172a;
+            color: #e2e8f0;
+            overflow: auto;
+            font-size: 0.82rem;
+        }
+        @media (max-width: 600px) {
+            .task-card { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container admin-shell" data-admin-page="tasks">
+        <%- include('partials/admin-navbar', { currentAdminSection: 'tasks', user: user }) %>
+        <div class="admin-header">
+            <div>
+                <span class="admin-eyebrow">Panel privado</span>
+                <h1>Tareas programadas</h1>
+                <p class="admin-subtitle">Gestiona las tareas automáticas del sistema. Puedes ejecutarlas manualmente en cualquier momento.</p>
+            </div>
+        </div>
+
+        <% if (error) { %>
+            <div class="admin-alert admin-alert-error"><%= error %></div>
+        <% } %>
+        <% if (success) { %>
+            <div class="admin-alert admin-alert-success"><%= success %></div>
+        <% } %>
+
+        <div class="admin-stats-grid">
+            <div class="admin-stat-card">
+                <span class="admin-stat-value"><%= tasks.length %></span>
+                <span class="admin-stat-label">Tareas registradas</span>
+            </div>
+            <div class="admin-stat-card">
+                <span class="admin-stat-value"><%= tasks.filter(t => t.lastStatus === 'ok').length %></span>
+                <span class="admin-stat-label">Ejecutadas OK</span>
+            </div>
+        </div>
+
+        <div class="admin-panel">
+            <div class="admin-panel-header">
+                <h2>Tareas activas</h2>
+                <p>Todas las tareas envían su resultado por Telegram si <code>TELEGRAM_TOKEN</code> y <code>TELEGRAM_CHAT_ID</code> están configurados en el entorno.</p>
+            </div>
+
+            <div class="task-list">
+                <% tasks.forEach((task) => { %>
+                    <div class="task-card">
+                        <div class="task-card-shell">
+                            <div style="display:flex; gap:1.5rem; align-items:flex-start; justify-content:space-between; flex-wrap:wrap;">
+                                <div class="task-card-info">
+                                    <h3><%= task.name %></h3>
+                                    <p><%= task.description %></p>
+                                    <div class="task-meta">
+                                        <span>⏰ <strong><%= task.scheduleLabel %></strong> (<code><%= task.schedule %></code>, <%= task.timezone %>)</span>
+                                        <% if (task.lastRun) { %>
+                                            <span>Última ejecución: <strong><%= new Date(task.lastRun).toLocaleString('es-ES') %></strong></span>
+                                            <% if (task.lastStatus === 'ok') { %>
+                                                <span class="task-status-ok">✅ <%= task.lastMessage %></span>
+                                            <% } else if (task.lastStatus === 'error') { %>
+                                                <span class="task-status-error">❌ <%= task.lastMessage %></span>
+                                            <% } else if (task.lastStatus === 'running') { %>
+                                                <span class="task-status-running">⏳ Ejecutando...</span>
+                                            <% } %>
+                                        <% } else { %>
+                                            <span>Aún no ejecutada en esta sesión.</span>
+                                        <% } %>
+                                    </div>
+                                </div>
+                                <div class="task-card-action">
+                                    <form method="POST" action="/admin/tasks/<%= task.id %>/run"
+                                          onsubmit="return confirm('¿Ejecutar ahora la tarea «<%= task.name %>»?');">
+                                        <button type="submit" class="admin-btn btn-save">Ejecutar ahora</button>
+                                    </form>
+                                </div>
+                            </div>
+
+                            <% if (task.lastResult) { %>
+                                <div class="task-result-panel">
+                                    <div class="admin-panel-header" style="margin-bottom:0;">
+                                        <h2 style="font-size:1rem; margin:0;">Resultado de la última ejecución</h2>
+                                    </div>
+
+                                    <% if (task.id === 'duplicateUrls') { %>
+                                        <div class="task-result-grid">
+                                            <div class="task-result-stat"><strong><%= task.lastResult.duplicateGroups || 0 %></strong><span>URLs duplicadas</span></div>
+                                            <div class="task-result-stat"><strong><%= task.lastResult.removableItems || 0 %></strong><span>Elementos eliminables</span></div>
+                                        </div>
+
+                                        <% if (task.lastResult.groups && task.lastResult.groups.length) { %>
+                                            <form method="POST" action="/admin/tasks/duplicateUrls/delete" class="duplicate-groups-form" onsubmit="return confirm('Se eliminarán las copias más nuevas de las URLs seleccionadas y se conservará siempre la más antigua.');">
+                                                <div class="duplicate-note">Selecciona una o varias URLs. Se conservará el primer artículo guardado y se eliminarán todas las copias más nuevas de cada grupo.</div>
+                                                <div class="duplicate-group-list">
+                                                    <% task.lastResult.groups.forEach((group) => { %>
+                                                        <label class="duplicate-group">
+                                                            <div class="duplicate-group-header">
+                                                                <input type="checkbox" name="urls" value="<%= group.url %>">
+                                                                <div class="duplicate-group-body">
+                                                                    <span class="duplicate-url"><%= group.url %></span>
+                                                                    <span class="duplicate-note">Aparece <strong><%= group.count %></strong> veces. Se mantiene: <strong><%= group.keepItem?.title || 'Sin título' %></strong>.</span>
+                                                                    <% if (group.deleteItems && group.deleteItems.length) { %>
+                                                                        <ol class="duplicate-item-list">
+                                                                            <% group.deleteItems.forEach((item) => { %>
+                                                                                <li><%= item.title || 'Sin título' %></li>
+                                                                            <% }); %>
+                                                                        </ol>
+                                                                    <% } %>
+                                                                </div>
+                                                            </div>
+                                                        </label>
+                                                    <% }); %>
+                                                </div>
+                                                <div class="task-inline-actions">
+                                                    <button type="submit" class="admin-btn btn-danger">Eliminar duplicados seleccionados</button>
+                                                </div>
+                                            </form>
+                                        <% } else { %>
+                                            <div class="empty-state">No se detectaron duplicados en la última ejecución.</div>
+                                        <% } %>
+                                    <% } else if (task.id === 'untaggedLinks') { %>
+                                        <div class="task-result-grid">
+                                            <div class="task-result-stat"><strong><%= task.lastResult.count || 0 %></strong><span>Links sin etiqueta</span></div>
+                                        </div>
+                                        <div class="task-inline-actions">
+                                            <a href="<%= task.lastResult.filterUrl || '/links-vistos?filter=untagged' %>" class="admin-btn btn-ghost">Ver links sin etiqueta</a>
+                                        </div>
+                                    <% } else if (task.id === 'scrapeAnalyze') { %>
+                                        <div class="task-result-grid">
+                                            <div class="task-result-stat"><strong><%= task.lastResult.total || 0 %></strong><span>Total procesados</span></div>
+                                            <div class="task-result-stat"><strong><%= task.lastResult.analyzed || 0 %></strong><span>Analizados</span></div>
+                                            <div class="task-result-stat"><strong><%= task.lastResult.errors || 0 %></strong><span>Errores</span></div>
+                                        </div>
+                                    <% } else { %>
+                                        <pre class="task-json-preview"><%= JSON.stringify(task.lastResult, null, 2) %></pre>
+                                    <% } %>
+                                </div>
+                            <% } %>
+                        </div>
+                    </div>
+                <% }); %>
+            </div>
+        </div>
+    </div>
+    <script src="/script.js"></script>
+</body>
+</html>

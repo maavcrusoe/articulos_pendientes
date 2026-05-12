@@ -60,6 +60,31 @@ header h1 {
     box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
 }
 
+.has-ui-icon {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ui-icon {
+    width: 1rem;
+    height: 1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.ui-icon svg {
+    width: 100%;
+    height: 100%;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
 /* Layout principal */
 .main-layout {
     display: grid;
@@ -525,12 +550,13 @@ mark {
     border-top: 1px solid #ecf0f1;
 }
 
-.back-home, .visit-original {
+.article-back-link, .visit-original {
     padding: 12px 25px;
     background: #667eea;
     color: white;
     text-decoration: none;
     border-radius: 25px;
+    font-weight: 600;
     transition: all 0.3s;
 }
 
@@ -538,7 +564,7 @@ mark {
     background: #27ae60;
 }
 
-.back-home:hover, .visit-original:hover {
+.article-back-link:hover, .visit-original:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 15px rgba(0,0,0,0.2);
 }
@@ -1296,6 +1322,18 @@ mark {
     color: #fff;
 }
 
+.btn-danger:hover {
+    background: #dc2626;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.action-btn-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
 .table-link-btn {
     background: #eff6ff;
     color: #1d4ed8;
@@ -1714,6 +1752,16 @@ mark {
 .modal-card {
     width: min(760px, 100%);
     padding: 24px;
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh;
+}
+
+.modal-body {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+    padding-right: 4px;
 }
 
 .modal-header {
@@ -1752,6 +1800,10 @@ mark {
     display: flex;
     justify-content: flex-end;
     gap: 12px;
+    flex-shrink: 0;
+    padding-top: 16px;
+    border-top: 1px solid #e2e8f0;
+    margin-top: 4px;
 }
 
 .footer-section a {

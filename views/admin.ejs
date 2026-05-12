@@ -3,114 +3,122 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin - Gestión de Usuarios</title>
+    <title>Admin — Dashboard</title>
     <link rel="stylesheet" href="/style.css">
+    <style>
+        .tag-cloud {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem 0.75rem;
+            align-items: center;
+            padding: 1rem 0;
+        }
+        .tag-cloud-item {
+            line-height: 1.3;
+            color: var(--accent, #4f8ef7);
+            font-weight: 500;
+            transition: opacity 0.15s;
+            text-decoration: none;
+        }
+        .tag-cloud-item:hover { opacity: 0.7; text-decoration: underline; }
+        .tag-cloud-item.tag-size-1 { font-size: 0.8rem; }
+        .tag-cloud-item.tag-size-2 { font-size: 1rem; }
+        .tag-cloud-item.tag-size-3 { font-size: 1.2rem; }
+        .tag-cloud-item.tag-size-4 { font-size: 1.45rem; }
+        .tag-cloud-item.tag-size-5 { font-size: 1.75rem; }
+        .tag-cloud-item.tag-size-6 { font-size: 2.1rem; }
+        .tag-cloud-item .tag-count {
+            font-size: 0.65em;
+            opacity: 0.55;
+            margin-left: 2px;
+        }
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+        @media (max-width: 700px) { .dashboard-grid { grid-template-columns: 1fr; } }
+        .stat-highlight { color: var(--accent, #4f8ef7); }
+        .stat-warning  { color: #f59e0b; }
+    </style>
 </head>
 <body>
-    <div class="container admin-shell" data-admin-page="users">
-        <%- include('partials/admin-navbar', { currentAdminSection: 'users', user: user }) %>
+    <div class="container admin-shell" data-admin-page="dashboard">
+        <%- include('partials/admin-navbar', { currentAdminSection: 'home', user: user }) %>
         <div class="admin-header">
             <div>
                 <span class="admin-eyebrow">Panel privado</span>
-                <h1>Gestión de usuarios</h1>
-                <p class="admin-subtitle">Crea, edita roles y elimina usuarios registrados.</p>
+                <h1>Dashboard</h1>
+                <p class="admin-subtitle">Resumen general del estado de la aplicación.</p>
             </div>
         </div>
-
-        <% if (error) { %>
-            <div class="admin-alert admin-alert-error"><%= error %></div>
-        <% } %>
-        <% if (success) { %>
-            <div class="admin-alert admin-alert-success"><%= success %></div>
-        <% } %>
 
         <div class="admin-stats-grid">
             <div class="admin-stat-card">
-                <span class="admin-stat-value"><%= users.length %></span>
-                <span class="admin-stat-label">Usuarios</span>
+                <span class="admin-stat-value stat-highlight"><%= totalPendientes %></span>
+                <span class="admin-stat-label">Artículos pendientes</span>
             </div>
             <div class="admin-stat-card">
-                <span class="admin-stat-value"><%= totalAdmins %></span>
-                <span class="admin-stat-label">Administradores</span>
+                <span class="admin-stat-value stat-highlight"><%= totalLinks %></span>
+                <span class="admin-stat-label">Links vistos</span>
+            </div>
+            <div class="admin-stat-card">
+                <span class="admin-stat-value <%= linksUntagged > 0 ? 'stat-warning' : '' %>"><%= linksUntagged %></span>
+                <span class="admin-stat-label">Links sin etiqueta</span>
+            </div>
+            <div class="admin-stat-card">
+                <span class="admin-stat-value"><%= totalUsers %></span>
+                <span class="admin-stat-label">Usuarios</span>
             </div>
         </div>
 
-        <div class="admin-grid">
-            <section class="admin-panel">
+        <div class="dashboard-grid">
+            <div class="admin-panel" style="grid-column: 1 / -1;">
                 <div class="admin-panel-header">
-                    <h2>Crear usuario</h2>
-                    <p>Los usuarios creados aquí podrán iniciar sesión de inmediato.</p>
+                    <h2>Nube de etiquetas</h2>
+                    <p>Etiquetas asignadas a links vistos. Tamaño proporcional a la frecuencia de uso.</p>
                 </div>
-                <form method="POST" action="/admin/users" class="admin-form admin-create-user-form">
-                    <div class="admin-form-row">
-                        <label class="admin-field">
-                            <span>Usuario</span>
-                            <input type="text" name="username" required>
-                        </label>
-                        <label class="admin-field">
-                            <span>Rol</span>
-                            <select name="role">
-                                <option value="user">Usuario</option>
-                                <option value="admin">Admin</option>
-                            </select>
-                        </label>
+                <% if (tags.length > 0) { %>
+                    <div class="tag-cloud">
+                        <% tags.forEach((tag) => { %>
+                            <a href="/links-vistos?search=<%= encodeURIComponent(tag.name) %>"
+                               class="tag-cloud-item tag-size-<%= tag.sizeClass %>"
+                               title="<%= tag.count %> link<%= tag.count === 1 ? '' : 's' %>">
+                                <%= tag.name %><span class="tag-count"><%= tag.count %></span>
+                            </a>
+                        <% }); %>
                     </div>
-                    <label class="admin-field">
-                        <span>Contraseña</span>
-                        <input type="password" name="password" minlength="6" required>
-                    </label>
-                    <button type="submit" class="admin-btn btn-save">Crear usuario</button>
-                </form>
-            </section>
+                <% } else { %>
+                    <div class="empty-state">Aún no hay etiquetas en los links guardados.</div>
+                <% } %>
+            </div>
 
-            <section class="admin-panel">
+            <div class="admin-panel">
                 <div class="admin-panel-header">
-                    <h2>Usuarios registrados</h2>
-                    <p>Edita nombre, rol o contraseña. Si no cambias la contraseña, déjala vacía.</p>
+                    <h2>Accesos rápidos</h2>
                 </div>
-                <div class="users-list">
-                    <% if (!users.length) { %>
-                        <div class="empty-state">No hay usuarios registrados.</div>
-                    <% } %>
-                    <% users.forEach((managedUser) => { %>
-                        <article class="user-card">
-                            <form method="POST" action="/admin/users/<%= managedUser.id %>/update" class="admin-form user-inline-form">
-                                <div class="user-card-top">
-                                    <div>
-                                        <h3><%= managedUser.username %></h3>
-                                        <p>Creado el <%= new Date(managedUser.createdAt).toLocaleDateString('es-ES') %></p>
-                                    </div>
-                                    <span class="role-pill role-pill-<%= managedUser.role %>"><%= managedUser.role %></span>
-                                </div>
-                                <div class="admin-form-row">
-                                    <label class="admin-field">
-                                        <span>Usuario</span>
-                                        <input type="text" name="username" value="<%= managedUser.username %>" required>
-                                    </label>
-                                    <label class="admin-field">
-                                        <span>Rol</span>
-                                        <select name="role">
-                                            <option value="user" <%= managedUser.role === 'user' ? 'selected' : '' %>>Usuario</option>
-                                            <option value="admin" <%= managedUser.role === 'admin' ? 'selected' : '' %>>Admin</option>
-                                        </select>
-                                    </label>
-                                </div>
-                                <label class="admin-field">
-                                    <span>Nueva contraseña</span>
-                                    <input type="password" name="password" minlength="6" placeholder="Solo si quieres cambiarla">
-                                </label>
-                                <div class="user-card-actions">
-                                    <button type="submit" class="admin-btn btn-save">Guardar cambios</button>
-                                </div>
-                            </form>
-                            <form method="POST" action="/admin/users/<%= managedUser.id %>/delete" class="delete-user-form" onsubmit="return confirm('¿Seguro que quieres eliminar este usuario?');">
-                                <button type="submit" class="admin-btn btn-danger">Eliminar</button>
-                            </form>
-                        </article>
-                    <% }); %>
+                <div style="display:flex; flex-direction:column; gap:0.6rem; padding: 0.5rem 0;">
+                    <a href="/notion-pending" class="admin-btn btn-save" style="text-align:center;">Ver pendientes de Notion</a>
+                    <a href="/links-vistos" class="admin-btn btn-ghost" style="text-align:center;">Ver links vistos</a>
+                    <a href="/admin/users" class="admin-btn btn-ghost" style="text-align:center;">Gestión de usuarios</a>
+                    <a href="/admin/tasks" class="admin-btn btn-ghost" style="text-align:center;">Tareas programadas</a>
                 </div>
-            </section>
+            </div>
+
+            <% if (linksUntagged > 0) { %>
+            <div class="admin-panel">
+                <div class="admin-panel-header">
+                    <h2>⚠️ Atención</h2>
+                </div>
+                <p style="padding: 0.5rem 0;">
+                    Hay <strong><%= linksUntagged %> link<%= linksUntagged === 1 ? '' : 's' %></strong> guardado<%= linksUntagged === 1 ? '' : 's' %> sin ninguna etiqueta asignada.<br>
+                    Puedes etiquetarlos desde la sección <a href="/links-vistos">Links vistos</a>.
+                </p>
+            </div>
+            <% } %>
         </div>
     </div>
+    <script src="/script.js"></script>
 </body>
 </html>

@@ -1,0 +1,4 @@
+{
+  "model": "llama3:8b",
+  "prompt": "Eres un clasificador técnico. Analiza el siguiente contenido (puede ser un tweet, artículo, repositorio GitHub o página web) y responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional ni markdown:\n\n{\"tags\": [\"tag1\", \"tag2\", \"tag3\"]}\n\nREGLAS:\n- Entre 3 y 6 tags en total\n- Tags en minúsculas, sin espacios (usa guión si es necesario: \"machine-learning\")\n- Combina tecnologías concretas (\"python\", \"react\", \"docker\") con conceptos temáticos (\"seguridad\", \"ia\", \"devops\")\n- Para tweets: extrae el tema principal y las tecnologías mencionadas\n- Para repos GitHub: usa el lenguaje, framework y tipo de proyecto\n- Para artículos: usa el tema, metodología y área técnica\n- NUNCA inventes información que no esté en el texto\n- SOLO devuelve el JSON, nada más\n\nContenido a analizar:\n"
+}

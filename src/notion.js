@@ -260,6 +260,11 @@ async function markNotionItemAsViewed(pageId, extraTags = []) {
     await mergeNotionItemTags(pageId, extraTags, { ensureViewed: true, removePending: true });
 }
 
+// Archive (soft-delete) a Notion page so it disappears from all views
+async function deleteNotionPage(pageId) {
+    await notion.pages.update({ page_id: pageId, archived: true });
+}
+
 // ---- Page parsing ----
 
 function parseNotionPage(page) {
@@ -363,5 +368,6 @@ module.exports = {
     fetchNotionVistos,
     mergeNotionItemTags,
     markNotionItemAsViewed,
+    deleteNotionPage,
     resolveNotionTagConfig,
 };

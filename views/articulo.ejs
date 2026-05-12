@@ -21,11 +21,6 @@
                         minute: '2-digit'
                     }) %>
                 </span>
-                <% if (articulo.url) { %>
-                    <a href="<%= articulo.url %>" target="_blank" rel="noopener" class="original-link">
-                        🔗 Ver enlace original
-                    </a>
-                <% } %>
             </div>
         </header>
 
@@ -58,7 +53,7 @@
             </div>
 
             <div class="article-actions-full">
-                <a href="/" class="back-home">← Volver al listado</a>
+                <a href="/" class="article-back-link">← Volver al listado</a>
                 <% if (articulo.url) { %>
                     <a href="<%= articulo.url %>" target="_blank" rel="noopener" class="visit-original">
                         🌐 Visitar sitio original

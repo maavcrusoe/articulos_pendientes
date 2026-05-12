@@ -13,7 +13,7 @@
             <div>
                 <span class="admin-eyebrow">Panel privado</span>
                 <h1>Pendientes de Notion</h1>
-                <p class="admin-subtitle">Solo se muestran los items pendientes. Puedes marcarlos como vistos y enriquecer sus etiquetas antes de guardarlos.</p>
+                <p class="admin-subtitle">Solo se muestran los items pendientes. Puedes marcarlos como vistos: se guardan en MongoDB y desaparecen del flujo de Notion.</p>
             </div>
         </div>
 
@@ -61,6 +61,7 @@
                 </div>
                 <div class="table-toolbar-actions">
                     <button class="admin-btn btn-refresh" id="refreshNotionButton" type="button">Refrescar</button>
+                    <button class="admin-btn btn-ghost" id="migrateVistosButton" type="button">Migrar vistos de Notion</button>
                     <div class="column-picker" data-table-id="notionTable" data-storage-key="notion-pending-columns">
                         <button class="column-picker-trigger" type="button" aria-label="Filtrar columnas" aria-expanded="false">
                             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" class="column-picker-icon"><path d="M3 5h18l-7 8v5l-4 2v-7L3 5z"></path></svg>
@@ -76,6 +77,7 @@
                             <tr>
                                 <th data-column-key="index" data-column-label="#" data-column-locked="true">#</th>
                                 <th data-column-key="title" data-column-label="Título">Título</th>
+                                <th data-column-key="date" data-column-label="Fecha">Fecha</th>
                                 <th data-column-key="status" data-column-label="Estado">Estado</th>
                                 <th class="js-tags-column" data-column-key="tags" data-column-label="Etiquetas">Etiquetas</th>
                                 <th data-column-key="url" data-column-label="URL">URL</th>
@@ -89,6 +91,7 @@
                                 <tr data-page-id="<%= item.id %>" data-page-title="<%= item.title || 'Sin título' %>" data-current-tags="<%= (item.tags || []).join(', ') %>">
                                     <td data-column-key="index"><%= index + 1 %></td>
                                     <td data-column-key="title" title="<%= item.title %>"><%= item.title || 'Sin título' %></td>
+                                    <td data-column-key="date"><%= item.dateLabel || 'Sin fecha' %></td>
                                     <td data-column-key="status">
                                         <span class="status-badge status-pending"><%= item.status || 'Pendiente' %></span>
                                     </td>
@@ -114,7 +117,12 @@
                                         <a href="<%= item.url %>" target="_blank" rel="noopener" class="table-link-btn table-link-btn-secondary">Abrir Notion</a>
                                     </td>
                                     <td data-column-key="action">
-                                        <button type="button" class="admin-btn btn-save mark-viewed-btn" data-page-id="<%= item.id %>" data-page-title="<%= item.title || 'Sin título' %>" data-current-tags="<%= (item.tags || []).join(', ') %>">
+                                        <button type="button" class="admin-btn btn-save mark-viewed-btn"
+                                            data-page-id="<%= item.id %>"
+                                            data-page-title="<%= item.title || 'Sin título' %>"
+                                            data-current-tags="<%= (item.tags || []).join(', ') %>"
+                                            data-source-url="<%= item.sourceUrl || '' %>"
+                                            data-notion-url="<%= item.url || '' %>">
                                             Marcar como visto
                                         </button>
                                     </td>
@@ -144,6 +152,7 @@
                 </div>
                 <button type="button" class="modal-close" id="closeNotionModal" aria-label="Cerrar">×</button>
             </div>
+            <div class="modal-body">
             <p class="modal-copy">Antes de guardar, puedes añadir etiquetas extra separadas por comas o seleccionar etiquetas ya disponibles.</p>
             <div class="modal-section">
                 <label class="admin-field">
@@ -167,6 +176,7 @@
                         <button type="button" class="tag-suggestion" data-tag-value="<%= tag %>" data-tag-count="<%= count %>" style="--tag-scale: <%= (0.85 + ((count || 1) / maxPendingTagCount) * 0.55).toFixed(2) %>" title="Usada <%= count %> veces en pendientes"><%= tag %></button>
                     <% }); %>
                 </div>
+            </div>
             </div>
             <div class="modal-actions">
                 <button type="button" class="admin-btn btn-ghost" id="cancelNotionModal">Cancelar</button>
