@@ -23,6 +23,29 @@ const notionRoutes = require('./src/routes/notion');
 const app = express();
 const port = process.env.PORT || 3000;
 
+function parseTrustProxy(value) {
+    if (value === undefined) {
+        return false;
+    }
+
+    const normalized = String(value).trim().toLowerCase();
+
+    if (normalized === 'true') {
+        return true;
+    }
+
+    if (normalized === 'false') {
+        return false;
+    }
+
+    const numericValue = Number(normalized);
+    return Number.isInteger(numericValue) ? numericValue : value;
+}
+
+const trustProxy = parseTrustProxy(process.env.TRUST_PROXY ?? (process.env.NODE_ENV === 'production' ? 1 : false));
+
+app.set('trust proxy', trustProxy);
+
 // ========== SEGURIDAD ==========
 // Helmet: cabeceras HTTP de seguridad
 app.use(helmet({
@@ -134,6 +157,7 @@ connectDB().then(async () => {
         line(`port    : ${port}`);
         line(`url     : http://localhost:${port}  🚀`);
         line(`tasks   : ${tasks} registered`);
+        line(`proxy   : ${trustProxy === false ? 'trust proxy disabled' : `trust proxy = ${trustProxy}`}`);
         line(`session : ${sessionConfigured ? '✅ SESSION_SECRET configured' : '⚠️ SESSION_SECRET NOT set (using temporary secret)'} `);
         console.log('='.repeat(60) + '\n');
     });

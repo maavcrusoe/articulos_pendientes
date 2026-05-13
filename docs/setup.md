@@ -19,6 +19,7 @@ PORT=3000                          # Puerto del servidor (por defecto 3000)
 ITEMS_PER_PAGE=20                  # Artículos por página (por defecto 10)
 SESSION_SECRET=clave_secreta_larga # Secreto de sesión — OBLIGATORIO en producción
 NODE_ENV=production                # Activa cookies seguras en producción
+TRUST_PROXY=1                      # Reverse proxy delante de Express (por ejemplo, Nginx)
 NOTION_DATA_SOURCE_ID=xxxx-xxxx   # ID del data source de Notion (se auto-detecta si se omite)
 ```
 
@@ -42,5 +43,6 @@ GITHUB_REPO=usuario/articulos_pendientes
 ## Notas de seguridad
 
 - `SESSION_SECRET` debe ser una cadena aleatoria larga. Si no se configura, se genera una temporal y las sesiones no sobrevivirán reinicios del servidor.
+- `TRUST_PROXY=1` es la configuración correcta cuando la app corre detrás de un único Nginx. Si tienes varios proxies, ajusta el valor al número de saltos o a la política de Express que corresponda.
 - El usuario admin por defecto (`admin` / `admin123`) se crea en el primer arranque. **Cámbialo inmediatamente en producción** desde el panel `/admin`.
 - `MONGODB_URI` puede incluir usuario y contraseña; nunca la cometas en el repositorio.

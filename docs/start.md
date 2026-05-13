@@ -16,6 +16,7 @@ El servidor escucha en el puerto definido por `PORT` (por defecto `3000`).
 | `SESSION_SECRET` | Cadena aleatoria larga (mín. 32 chars) |
 | `NODE_ENV` | `production` |
 | `MONGODB_URI` | URI completa con credenciales |
+| `TRUST_PROXY` | `1` si hay un Nginx delante |
 
 ## Comprobaciones al arranque
 

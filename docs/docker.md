@@ -40,6 +40,7 @@ environment:
   - NODE_ENV=production
   - MONGODB_URI=mongodb://...
   - SESSION_SECRET=...
+  - TRUST_PROXY=1
   # resto de variables
 ```
 

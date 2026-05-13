@@ -46,7 +46,10 @@ MONGODB_URI=mongodb://localhost:27017
 DB_NAME=tu_basedatos
 CollectionName=pendientes
 ITEMS_PER_PAGE=10
+TRUST_PROXY=1
 ```
+
+Si la app está detrás de Nginx o de otro reverse proxy, usa `TRUST_PROXY=1` para confiar en el primer proxy y permitir que Express y `express-rate-limit` identifiquen bien la IP cliente. En producción el servidor ya asume `1` por defecto; esta variable te permite ajustarlo si tu despliegue usa otra topología.
 
 ## 🏃 Ejecución
 
