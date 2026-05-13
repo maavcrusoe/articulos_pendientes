@@ -23,6 +23,20 @@ const notionRoutes = require('./src/routes/notion');
 const app = express();
 const port = process.env.PORT || 3000;
 
+function getClientIp(req) {
+    const forwardedFor = req.headers['x-forwarded-for'];
+
+    if (typeof forwardedFor === 'string' && forwardedFor.trim()) {
+        return forwardedFor.split(',')[0].trim();
+    }
+
+    if (Array.isArray(forwardedFor) && forwardedFor.length > 0) {
+        return String(forwardedFor[0]).split(',')[0].trim();
+    }
+
+    return req.ip || req.socket?.remoteAddress || 'unknown';
+}
+
 function parseTrustProxy(value) {
     if (value === undefined) {
         return false;
@@ -53,12 +67,17 @@ app.use(helmet({
 }));
 
 // Limitar peticiones globales
-app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 500 }));
+app.use(rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 500,
+    keyGenerator: getClientIp,
+}));
 
 // Limitar intentos de login (protección contra fuerza bruta)
 const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 10,
+    keyGenerator: getClientIp,
     message: 'Demasiados intentos de inicio de sesión. Intenta de nuevo en 15 minutos.',
     standardHeaders: true,
     legacyHeaders: false,

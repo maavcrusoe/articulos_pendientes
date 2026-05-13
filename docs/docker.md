@@ -23,6 +23,8 @@ O añadir las variables en el entorno del host o en un `.env` en la raíz antes 
 docker-compose up -d --build
 ```
 
+El build usa el código del workspace actual, así que cualquier cambio local entra en la imagen al reconstruir.
+
 ## Fichero `docker-compose.yml`
 
 El contenedor expone el puerto **3005** internamente y lo conecta a la red `web`. Ver [`docker-compose.yml`](../docker-compose.yml) para la configuración completa.
