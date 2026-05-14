@@ -3,13 +3,15 @@ const { ObjectId } = require('mongodb');
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
 const path = require('path');
-const { getUsersCollection, getCollection, getLinksCollection } = require('../db');
+const { getUsersCollection, getCollection, getLinksCollection, getProposalsCollection } = require('../db');
 const { requireAdmin } = require('../middleware');
 const { normalizeUsername, isValidObjectId } = require('../utils');
-const { getTaskRegistry, runTaskById, updateTaskState } = require('../tasks/scheduler');
+const { getTaskRegistry, runTaskById, updateTaskState, registerDynamicTask, unregisterTask } = require('../tasks/scheduler');
 const { findDuplicateUrls, formatDuplicateGroups } = require('../tasks/duplicateReport');
+const { appLogger } = require('../logger');
 
 const CONFIG_PATH = path.join(__dirname, '../../prompt/config.json');
+const CUSTOM_TASKS_DIR = path.join(__dirname, '../tasks/custom');
 
 const router = Router();
 
@@ -121,6 +123,7 @@ router.post('/admin/users', requireAdmin, async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 12);
         await getUsersCollection().insertOne({ username, password: hashedPassword, role, createdAt: new Date() });
+        appLogger.info(`✅ Admin ${req.session.user.username} creó usuario: ${username} (rol: ${role}) | IP: ${req.ip}`);
         await renderAdminUsers(res, { success: 'Usuario creado correctamente.' });
     } catch (error) {
         console.error('❌ Error creando usuario:', error);
@@ -169,6 +172,7 @@ router.post('/admin/users/:id/update', requireAdmin, async (req, res) => {
             req.session.user.role = role;
         }
 
+        appLogger.info(`✅ Admin ${req.session.user.username} actualizó usuario ID ${userId}: username=${username}, role=${role} | IP: ${req.ip}`);
         await renderAdminUsers(res, { success: 'Usuario actualizado correctamente.' });
     } catch (error) {
         console.error('❌ Error actualizando usuario:', error);
@@ -197,6 +201,7 @@ router.post('/admin/users/:id/delete', requireAdmin, async (req, res) => {
         }
 
         await getUsersCollection().deleteOne({ _id: new ObjectId(userId) });
+        appLogger.info(`⚠️ Admin ${req.session.user.username} eliminó usuario ID ${userId} (${existingUser.username}) | IP: ${req.ip}`);
         await renderAdminUsers(res, { success: 'Usuario eliminado correctamente.' });
     } catch (error) {
         console.error('❌ Error eliminando usuario:', error);
@@ -217,6 +222,7 @@ router.get('/admin/tasks', requireAdmin, async (req, res) => {
 router.post('/admin/tasks/:id/run', requireAdmin, async (req, res) => {
     try {
         const taskId = req.params.id;
+        appLogger.info(`⚠️ Admin ${req.session.user.username} ejecutó la tarea "${taskId}" manualmente | IP: ${req.ip}`);
         await runTaskById(taskId);
         await renderTasksPage(res, { success: `Tarea "${taskId}" ejecutada.` });
     } catch (error) {
@@ -273,6 +279,156 @@ router.post('/admin/tasks/duplicateUrls/delete', requireAdmin, async (req, res) 
     } catch (error) {
         console.error('❌ Error eliminando duplicados:', error);
         await renderTasksPage(res, { error: error.message || 'No se pudieron eliminar los duplicados seleccionados.' });
+    }
+});
+
+// ---- Create dynamic task ----
+router.post('/admin/tasks/new', requireAdmin, async (req, res) => {
+    try {
+        const id = String(req.body.id || '').trim().replace(/[^a-zA-Z0-9_-]/g, '');
+        const name = String(req.body.name || '').trim();
+        const description = String(req.body.description || '').trim();
+        const schedule = String(req.body.schedule || '').trim();
+        const scheduleLabel = String(req.body.scheduleLabel || '').trim();
+        const timezone = String(req.body.timezone || 'Europe/Madrid').trim();
+        const scriptBody = String(req.body.scriptBody || '').trim();
+
+        if (!id || !name || !schedule || !scriptBody) {
+            return renderTasksPage(res, { error: 'ID, nombre, expresión cron y código son obligatorios.' });
+        }
+        if (!/^[a-zA-Z][a-zA-Z0-9_-]{1,39}$/.test(id)) {
+            return renderTasksPage(res, { error: 'El ID sólo puede contener letras, números, guiones y guiones bajos (2-40 caracteres, debe empezar por letra).' });
+        }
+
+        const existing = getTaskRegistry().find((t) => t.id === id);
+        if (existing && !existing.dynamic) {
+            return renderTasksPage(res, { error: `El ID "${id}" está reservado por una tarea del sistema.` });
+        }
+
+        registerDynamicTask({ id, name, description, schedule, scheduleLabel: scheduleLabel || schedule, timezone, scriptBody });
+        appLogger.info(`✅ Tarea dinámica creada/actualizada por admin: ${id}`);
+        await renderTasksPage(res, { success: `Tarea "${name}" registrada y activa.` });
+    } catch (error) {
+        appLogger.error(`❌ Error creando tarea dinámica: ${error.message}`);
+        await renderTasksPage(res, { error: error.message || 'No se pudo crear la tarea.' });
+    }
+});
+
+// ---- Delete dynamic task ----
+router.post('/admin/tasks/:id/delete-dynamic', requireAdmin, async (req, res) => {
+    try {
+        const taskId = req.params.id;
+        const tasks = getTaskRegistry();
+        const task = tasks.find((t) => t.id === taskId);
+        if (!task) return renderTasksPage(res, { error: `Tarea "${taskId}" no encontrada.` });
+        if (!task.dynamic) return renderTasksPage(res, { error: 'Sólo se pueden eliminar tareas dinámicas creadas desde el panel.' });
+
+        unregisterTask(taskId);
+
+        // Remove persisted files
+        const scriptPath = path.join(CUSTOM_TASKS_DIR, `${taskId}.js`);
+        const metaPath = path.join(CUSTOM_TASKS_DIR, `${taskId}.meta.json`);
+        [scriptPath, metaPath].forEach((f) => { try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch (_) {} });
+
+        appLogger.info(`✅ Tarea dinámica eliminada: ${taskId}`);
+        await renderTasksPage(res, { success: `Tarea "${taskId}" eliminada correctamente.` });
+    } catch (error) {
+        appLogger.error(`❌ Error eliminando tarea dinámica: ${error.message}`);
+        await renderTasksPage(res, { error: error.message || 'No se pudo eliminar la tarea.' });
+    }
+});
+
+// ---- Tag Merge Proposals ----
+router.get('/admin/tag-merges', requireAdmin, async (req, res) => {
+    try {
+        const proposals = getProposalsCollection();
+        const [pending, recent] = await Promise.all([
+            proposals.find({ status: 'pending' }).sort({ createdAt: -1 }).toArray(),
+            proposals
+                .find({ status: { $in: ['approved', 'rejected'] } })
+                .sort({ resolvedAt: -1 })
+                .limit(20)
+                .toArray(),
+        ]);
+        res.render('admin-tag-merges', {
+            pending,
+            recent,
+            currentAdminSection: 'tag-merges',
+            error: null,
+            success: null,
+        });
+    } catch (error) {
+        appLogger.error(`❌ Error cargando propuestas de fusión: ${error.message}`);
+        res.status(500).render('error', { error: 'Error cargando las propuestas de fusión de etiquetas' });
+    }
+});
+
+router.post('/admin/tag-merges/:id/approve', requireAdmin, async (req, res) => {
+    try {
+        const proposalId = req.params.id;
+        if (!isValidObjectId(proposalId)) {
+            return res.status(400).json({ error: 'ID de propuesta no válido.' });
+        }
+        const proposals = getProposalsCollection();
+        const proposal = await proposals.findOne({ _id: new ObjectId(proposalId), status: 'pending' });
+        if (!proposal) {
+            return res.status(404).json({ error: 'Propuesta no encontrada o ya procesada.' });
+        }
+
+        const { keepTag, dropTag } = proposal;
+        for (const col of [getCollection(), getLinksCollection()]) {
+            const idsNeedingKeepTag = await col
+                .find(
+                    { tags: dropTag, $nor: [{ tags: keepTag }] },
+                    { projection: { _id: 1 } },
+                )
+                .toArray();
+
+            await col.updateMany(
+                { tags: dropTag },
+                { $pull: { tags: dropTag } },
+            );
+
+            if (idsNeedingKeepTag.length) {
+                await col.updateMany(
+                    { _id: { $in: idsNeedingKeepTag.map((doc) => doc._id) } },
+                    { $addToSet: { tags: keepTag } },
+                );
+            }
+        }
+
+        await proposals.updateOne(
+            { _id: new ObjectId(proposalId) },
+            { $set: { status: 'approved', resolvedAt: new Date(), resolvedBy: req.session.user.username } },
+        );
+        appLogger.info(`✅ Admin ${req.session.user.username} aprobó fusión: "${dropTag}" → "${keepTag}" | IP: ${req.ip}`);
+        res.json({ ok: true, message: `Fusión aplicada: "${dropTag}" → "${keepTag}"` });
+    } catch (error) {
+        appLogger.error(`❌ Error aprobando fusión de etiquetas: ${error.message}`);
+        res.status(500).json({ error: 'Error al aplicar la fusión.' });
+    }
+});
+
+router.post('/admin/tag-merges/:id/reject', requireAdmin, async (req, res) => {
+    try {
+        const proposalId = req.params.id;
+        if (!isValidObjectId(proposalId)) {
+            return res.status(400).json({ error: 'ID de propuesta no válido.' });
+        }
+        const proposals = getProposalsCollection();
+        const proposal = await proposals.findOne({ _id: new ObjectId(proposalId), status: 'pending' });
+        if (!proposal) {
+            return res.status(404).json({ error: 'Propuesta no encontrada o ya procesada.' });
+        }
+        await proposals.updateOne(
+            { _id: new ObjectId(proposalId) },
+            { $set: { status: 'rejected', resolvedAt: new Date(), resolvedBy: req.session.user.username } },
+        );
+        appLogger.info(`⚠️ Admin ${req.session.user.username} rechazó fusión: "${proposal.dropTag}" → "${proposal.keepTag}" | IP: ${req.ip}`);
+        res.json({ ok: true, message: 'Propuesta rechazada.' });
+    } catch (error) {
+        appLogger.error(`❌ Error rechazando fusión: ${error.message}`);
+        res.status(500).json({ error: 'Error al rechazar la propuesta.' });
     }
 });
 

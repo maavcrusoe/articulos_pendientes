@@ -73,16 +73,17 @@ app.use(rateLimit({
     keyGenerator: getClientIp,
 }));
 
-// Limitar intentos de login (protección contra fuerza bruta)
-const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 10,
-    keyGenerator: getClientIp,
-    message: 'Demasiados intentos de inicio de sesión. Intenta de nuevo en 15 minutos.',
-    standardHeaders: true,
-    legacyHeaders: false,
+// Permissions-Policy: deshabilitar APIs de navegador no utilizadas en esta app
+app.use((req, res, next) => {
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), interest-cohort=()');
+    next();
 });
-app.use('/admin/login', loginLimiter);
+
+// Cache-Control: las rutas de administración no deben quedar cacheadas en el navegador
+app.use('/admin', (req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    next();
+});
 
 // ========== MIDDLEWARE GENERAL ==========
 app.use(express.static('public'));

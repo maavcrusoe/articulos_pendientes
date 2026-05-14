@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "changelog:add": "node scripts/add-changelog-entry.js"
   },
   "dependencies": {
     "@notionhq/client": "^5.19.0",

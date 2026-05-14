@@ -28,7 +28,13 @@ router.get('/', async (req, res) => {
         }
 
         if (tag && tag.trim()) {
-            filterClauses.push(buildTagMatchQuery(tag.trim()));
+            const tagsArray = tag.split(',').map(t => t.trim()).filter(Boolean);
+            if (tagsArray.length === 1) {
+                filterClauses.push(buildTagMatchQuery(tagsArray[0]));
+            } else if (tagsArray.length > 1) {
+                // AND logic: all selected tags must be present
+                filterClauses.push({ $and: tagsArray.map(t => buildTagMatchQuery(t)) });
+            }
         }
 
         if (categoria) {

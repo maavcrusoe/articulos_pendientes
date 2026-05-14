@@ -1,0 +1,24 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": "powershell -NoProfile -File .github/hooks/scripts/pre-tool-guard.ps1",
+        "windows": "powershell -NoProfile -File .github/hooks/scripts/pre-tool-guard.ps1",
+        "linux": "bash .github/hooks/scripts/pre-tool-guard.sh",
+        "osx": "bash .github/hooks/scripts/pre-tool-guard.sh",
+        "timeout": 10
+      }
+    ],
+    "PostToolUse": [
+      {
+        "type": "command",
+        "command": "powershell -NoProfile -File .github/hooks/scripts/post-edit-remind.ps1",
+        "windows": "powershell -NoProfile -File .github/hooks/scripts/post-edit-remind.ps1",
+        "linux": "bash .github/hooks/scripts/post-edit-remind.sh",
+        "osx": "bash .github/hooks/scripts/post-edit-remind.sh",
+        "timeout": 5
+      }
+    ]
+  }
+}

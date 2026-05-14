@@ -143,70 +143,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Mostrar tooltip informativo si hay filtros activos
     if (searchInput) {
         const hasActiveFilters = document.querySelector('.active-filters-inline');
-        
         if (hasActiveFilters) {
-            searchInput.setAttribute('title', 'Los filtros de etiqueta/categoría se mantendrán al buscar');
+            searchInput.setAttribute('title', 'Los filtros de categoría se mantendrán al buscar');
         }
-        
-        // Debounce mejorado para búsqueda en tiempo real
-        let searchTimeout;
-        
-        // Mostrar indicador de búsqueda
-        const showSearching = () => {
-            searchInput.classList.add('searching');
-        };
-        
-        const hideSearching = () => {
-            searchInput.classList.remove('searching');
-        };
-        
-        searchInput.addEventListener('input', function() {
-            clearTimeout(searchTimeout);
-            
-            const searchValue = this.value.trim();
-            
-            // Si está vacío o tiene menos de 2 caracteres, limpiar
-            if (searchValue.length === 0) {
-                searchTimeout = setTimeout(() => {
-                    this.form.submit();
-                }, 300);
-                return;
-            }
-            
-            // Búsqueda para términos de 2+ caracteres
-            if (searchValue.length >= 2) {
-                showSearching();
-                searchTimeout = setTimeout(() => {
-                    hideSearching();
-                    this.form.submit();
-                }, 500);
-            }
-        });
-        
-        // Búsqueda al presionar Enter
-        searchInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                clearTimeout(searchTimeout);
-                hideSearching();
-                this.form.submit();
-            }
-        });
-        
-        // Animación al enfocar con filtros activos
-        searchInput.addEventListener('focus', function() {
-            if (hasActiveFilters) {
-                hasActiveFilters.style.transform = 'scale(1.02)';
-                hasActiveFilters.style.transition = 'transform 0.2s';
-            }
-        });
-        
-        searchInput.addEventListener('blur', function() {
-            if (hasActiveFilters) {
-                hasActiveFilters.style.transform = 'scale(1)';
-            }
-        });
     }
+
+    initTagFilter();
 
     // Efectos visuales con animación escalonada
     const articles = document.querySelectorAll('.article-card');
@@ -435,6 +377,194 @@ function initColumnPickers() {
             if (event.key === 'Escape') {
                 closeMenu();
             }
+        });
+    });
+}
+
+function initTagFilter() {
+    const tagsInput = document.getElementById('selectedTagsInput');
+    const chipsContainer = document.getElementById('selectedTagsChips');
+    const searchInput = document.querySelector('.search-input');
+    const suggestBox = document.getElementById('tagSuggest');
+    if (!tagsInput || !chipsContainer) return;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    let selectedTags = (urlParams.get('tag') || '')
+        .split(',').map(function(t) { return t.trim(); }).filter(Boolean);
+
+    // All available tag names collected from sidebar bubbles
+    const allTagNames = Array.from(
+        document.querySelectorAll('.tag-bubble[data-tag-name]')
+    ).map(function(el) { return el.dataset.tagName; });
+
+    let highlightedIndex = -1;
+    let currentSuggestions = [];
+
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // --- Chips ---
+    function renderChips() {
+        chipsContainer.innerHTML = '';
+        selectedTags.forEach(function(tag) {
+            var chip = document.createElement('span');
+            chip.className = 'tag-chip-selected';
+            chip.innerHTML =
+                '<span class="tag-chip-label">' + escapeHtml(tag) + '</span>' +
+                '<button type="button" class="tag-chip-remove" aria-label="Quitar ' + escapeHtml(tag) + '">\u00d7</button>';
+            chip.querySelector('.tag-chip-remove').addEventListener('click', function() {
+                removeTag(tag);
+            });
+            chipsContainer.appendChild(chip);
+        });
+        chipsContainer.classList.toggle('has-chips', selectedTags.length > 0);
+    }
+
+    function updateBubbles() {
+        document.querySelectorAll('.tag-bubble[data-tag-name]').forEach(function(bubble) {
+            bubble.classList.toggle('active', selectedTags.includes(bubble.dataset.tagName));
+        });
+    }
+
+    function syncState() {
+        tagsInput.value = selectedTags.join(',');
+        renderChips();
+        updateBubbles();
+    }
+
+    function addTag(tag) {
+        if (!selectedTags.includes(tag)) {
+            selectedTags.push(tag);
+            syncState();
+        }
+    }
+
+    function removeTag(tag) {
+        selectedTags = selectedTags.filter(function(t) { return t !== tag; });
+        syncState();
+    }
+
+    function toggleTag(tag) {
+        if (selectedTags.includes(tag)) { removeTag(tag); } else { addTag(tag); }
+    }
+
+    // --- Autocomplete ---
+    function getSuggestions(query) {
+        if (!query || query.length < 1) return [];
+        var q = query.toLowerCase();
+        return allTagNames
+            .filter(function(name) {
+                return name.toLowerCase().includes(q) && !selectedTags.includes(name);
+            })
+            .slice(0, 8);
+    }
+
+    function highlightMatch(text, query) {
+        var idx = text.toLowerCase().indexOf(query.toLowerCase());
+        if (idx === -1) return escapeHtml(text);
+        return escapeHtml(text.slice(0, idx)) +
+            '<mark>' + escapeHtml(text.slice(idx, idx + query.length)) + '</mark>' +
+            escapeHtml(text.slice(idx + query.length));
+    }
+
+    function renderSuggestions(suggestions, query) {
+        if (!suggestBox) return;
+        currentSuggestions = suggestions;
+        highlightedIndex = -1;
+        if (suggestions.length === 0) {
+            suggestBox.hidden = true;
+            suggestBox.innerHTML = '';
+            return;
+        }
+        suggestBox.innerHTML = '';
+        suggestions.forEach(function(tag) {
+            var item = document.createElement('div');
+            item.className = 'tag-suggest-item';
+            item.setAttribute('role', 'option');
+            item.dataset.tagName = tag;
+            item.innerHTML =
+                '<span class="tag-suggest-icon">\ud83c\udff7\ufe0f</span>' +
+                '<span class="tag-suggest-text">' + highlightMatch(tag, query) + '</span>' +
+                '<kbd class="tag-suggest-hint">Enter</kbd>';
+            item.addEventListener('mousedown', function(e) {
+                e.preventDefault(); // prevent blur before click fires
+                addTag(tag);
+                if (searchInput) { searchInput.value = ''; searchInput.focus(); }
+                closeSuggestions();
+            });
+            suggestBox.appendChild(item);
+        });
+        suggestBox.hidden = false;
+    }
+
+    function closeSuggestions() {
+        if (suggestBox) { suggestBox.hidden = true; suggestBox.innerHTML = ''; }
+        currentSuggestions = [];
+        highlightedIndex = -1;
+    }
+
+    function setHighlight(index) {
+        var items = suggestBox ? Array.from(suggestBox.querySelectorAll('.tag-suggest-item')) : [];
+        items.forEach(function(el, i) { el.classList.toggle('highlighted', i === index); });
+        highlightedIndex = index;
+    }
+
+    // --- Search input events ---
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            renderSuggestions(getSuggestions(this.value), this.value);
+        });
+
+        searchInput.addEventListener('keydown', function(e) {
+            var items = suggestBox ? Array.from(suggestBox.querySelectorAll('.tag-suggest-item')) : [];
+            var suggestOpen = suggestBox && !suggestBox.hidden && items.length > 0;
+
+            if (e.key === 'ArrowDown') {
+                if (!suggestOpen) return;
+                e.preventDefault();
+                setHighlight((highlightedIndex + 1) % items.length);
+            } else if (e.key === 'ArrowUp') {
+                if (!suggestOpen) return;
+                e.preventDefault();
+                setHighlight(highlightedIndex <= 0 ? items.length - 1 : highlightedIndex - 1);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (suggestOpen && highlightedIndex >= 0 && currentSuggestions[highlightedIndex]) {
+                    addTag(currentSuggestions[highlightedIndex]);
+                    this.value = '';
+                    closeSuggestions();
+                } else {
+                    closeSuggestions();
+                    this.form.submit();
+                }
+            } else if (e.key === 'Tab' && suggestOpen && currentSuggestions.length === 1) {
+                e.preventDefault();
+                addTag(currentSuggestions[0]);
+                this.value = '';
+                closeSuggestions();
+            } else if (e.key === 'Escape') {
+                closeSuggestions();
+            } else if (e.key === 'Backspace' && this.value === '' && selectedTags.length > 0) {
+                removeTag(selectedTags[selectedTags.length - 1]);
+            }
+        });
+
+        searchInput.addEventListener('blur', function() {
+            setTimeout(closeSuggestions, 150);
+        });
+    }
+
+    // Init from URL
+    syncState();
+
+    // Sidebar tag bubble clicks
+    document.querySelectorAll('.tag-bubble[data-tag-name]').forEach(function(bubble) {
+        bubble.addEventListener('click', function(e) {
+            e.preventDefault();
+            toggleTag(this.dataset.tagName);
         });
     });
 }

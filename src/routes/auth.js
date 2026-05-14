@@ -1,8 +1,29 @@
 const { Router } = require('express');
 const bcrypt = require('bcryptjs');
+const rateLimit = require('express-rate-limit');
 const { getUsersCollection } = require('../db');
+const { appLogger } = require('../logger');
 
 const router = Router();
+
+// Rate limiter de login: aplicado sólo al POST, no al GET de la página
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: 'Demasiados intentos de inicio de sesión. Intenta de nuevo en 15 minutos.',
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: true, // solo cuentan los intentos fallidos
+});
+
+// Rate limiter de registro: 5 cuentas por IP por hora
+const registerLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 5,
+    message: 'Demasiados registros desde esta IP. Intenta de nuevo en una hora.',
+    standardHeaders: true,
+    legacyHeaders: false,
+});
 
 // Login page
 router.get('/admin/login', (req, res) => {
@@ -11,15 +32,22 @@ router.get('/admin/login', (req, res) => {
 });
 
 // Login POST
-router.post('/admin/login', async (req, res) => {
+router.post('/admin/login', loginLimiter, async (req, res) => {
     try {
         const { username, password } = req.body;
         if (!username || !password) {
             return res.render('login', { error: 'Usuario y contraseña son requeridos' });
         }
 
+        // Limitar longitud de entrada para prevenir ataques de DoS sobre bcrypt
+        if (String(username).length > 100 || String(password).length > 200) {
+            appLogger.warn(`⚠️ Login rechazado por longitud excesiva de campos. IP: ${req.ip}`);
+            return res.render('login', { error: 'Credenciales incorrectas' });
+        }
+
         const user = await getUsersCollection().findOne({ username: username.toLowerCase().trim() });
         if (!user || !await bcrypt.compare(password, user.password)) {
+            appLogger.warn(`⚠️ Intento de login fallido. Usuario: ${String(username).toLowerCase().trim()} | IP: ${req.ip}`);
             return res.render('login', { error: 'Credenciales incorrectas' });
         }
 
@@ -29,6 +57,7 @@ router.post('/admin/login', async (req, res) => {
                 return res.render('login', { error: 'Error del servidor' });
             }
             req.session.user = { id: user._id, username: user.username, role: user.role };
+            appLogger.info(`✅ Login exitoso. Usuario: ${user.username} | IP: ${req.ip}`);
             res.redirect('/admin');
         });
     } catch (error) {
@@ -44,17 +73,21 @@ router.get('/admin/register', (req, res) => {
 });
 
 // Register POST
-router.post('/admin/register', async (req, res) => {
+router.post('/admin/register', registerLimiter, async (req, res) => {
     try {
         const { username, password, password2 } = req.body;
         if (!username || !password || !password2) {
             return res.render('register', { error: 'Todos los campos son requeridos', success: null });
         }
+        // Limitar longitud de entrada para prevenir DoS sobre bcrypt
+        if (String(password).length > 200 || String(username).length > 100) {
+            return res.render('register', { error: 'Los campos superarán la longitud máxima permitida', success: null });
+        }
         if (password !== password2) {
             return res.render('register', { error: 'Las contraseñas no coinciden', success: null });
         }
-        if (password.length < 6) {
-            return res.render('register', { error: 'La contraseña debe tener al menos 6 caracteres', success: null });
+        if (password.length < 8) {
+            return res.render('register', { error: 'La contraseña debe tener al menos 8 caracteres', success: null });
         }
         if (username.trim().length < 3 || username.trim().length > 30) {
             return res.render('register', { error: 'El usuario debe tener entre 3 y 30 caracteres', success: null });

@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin — Fusión de etiquetas</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<%
+    const approvedCount = recent.filter((item) => item.status === 'approved').length;
+    const rejectedCount = recent.filter((item) => item.status === 'rejected').length;
+%>
+<div class="container admin-shell tag-merge-shell" data-admin-page="tag-merges">
+    <%- include('partials/admin-navbar', { currentAdminSection: 'tasks', user: user }) %>
+
+    <div class="admin-header tag-merge-header">
+        <div>
+            <span class="admin-eyebrow">Revisión manual</span>
+            <h1>Fusión de etiquetas</h1>
+            <p class="admin-subtitle">
+                Aquí revisas las propuestas que genera la tarea semanal. Cada tarjeta muestra qué etiqueta se elimina,
+                cuál se conserva y cuántos artículos o links cambiarían si apruebas la fusión.
+            </p>
+        </div>
+        <div class="admin-header-actions">
+            <a href="/admin/tasks" class="admin-btn btn-ghost">Volver a tareas</a>
+        </div>
+    </div>
+
+    <% if (error) { %>
+        <div class="admin-alert admin-alert-error"><%= error %></div>
+    <% } %>
+    <% if (success) { %>
+        <div class="admin-alert admin-alert-success"><%= success %></div>
+    <% } %>
+
+    <div id="feedback-msg" class="admin-alert tag-merge-feedback" hidden></div>
+
+    <div class="admin-stats-grid tag-merge-stats">
+        <div class="admin-stat-card tag-merge-stat-card tag-merge-stat-card-pending">
+            <span class="admin-stat-value" id="pending-count"><%= pending.length %></span>
+            <span class="admin-stat-label">Pendientes de revisión</span>
+        </div>
+        <div class="admin-stat-card tag-merge-stat-card tag-merge-stat-card-approved">
+            <span class="admin-stat-value"><%= approvedCount %></span>
+            <span class="admin-stat-label">Aprobadas recientemente</span>
+        </div>
+        <div class="admin-stat-card tag-merge-stat-card tag-merge-stat-card-rejected">
+            <span class="admin-stat-value"><%= rejectedCount %></span>
+            <span class="admin-stat-label">Rechazadas recientemente</span>
+        </div>
+    </div>
+
+    <div class="tag-merge-layout">
+        <section class="admin-panel tag-merge-panel tag-merge-panel-primary">
+            <div class="admin-panel-header tag-merge-panel-header">
+                <div>
+                    <h2>Propuestas pendientes</h2>
+                    <p>Aprueba solo cuando la etiqueta final represente correctamente a todos los documentos afectados.</p>
+                </div>
+                <div class="tag-merge-legend" aria-label="Leyenda visual de etiquetas">
+                    <span class="tag-merge-chip tag-merge-chip-drop">Se elimina</span>
+                    <span class="tag-merge-chip tag-merge-chip-keep">Se conserva</span>
+                </div>
+            </div>
+
+            <div class="tag-merge-empty" id="pending-empty" <%= pending.length ? 'hidden' : '' %>>
+                <strong>No hay propuestas pendientes.</strong>
+                <p>La tarea semanal generará nuevas sugerencias automáticamente cuando detecte etiquetas similares.</p>
+            </div>
+
+            <div class="tag-merge-list" id="pending-list" <%= pending.length ? '' : 'hidden' %>>
+                <% pending.forEach(function(p) { %>
+                    <article class="tag-merge-card" id="proposal-<%= p._id %>">
+                        <div class="tag-merge-card-head">
+                            <span class="tag-merge-status tag-merge-status-pending">Pendiente</span>
+                            <span class="tag-merge-card-id">Propuesta <%= String(p._id).slice(-6) %></span>
+                        </div>
+
+                        <div class="tag-merge-flow" aria-label="Fusión propuesta">
+                            <span class="tag-merge-chip tag-merge-chip-drop"><%= p.dropTag %></span>
+                            <span class="tag-merge-flow-arrow">→</span>
+                            <span class="tag-merge-chip tag-merge-chip-keep"><%= p.keepTag %></span>
+                        </div>
+
+                        <p class="tag-merge-card-copy">
+                            Se reemplazará <strong><%= p.dropTag %></strong> por <strong><%= p.keepTag %></strong> en ambas colecciones,
+                            evitando duplicar la etiqueta resultante en un mismo documento.
+                        </p>
+
+                        <div class="tag-merge-metrics">
+                            <div class="tag-merge-metric tag-merge-metric-drop">
+                                <span class="tag-merge-metric-label">Etiqueta a eliminar</span>
+                                <strong><%= p.dropTag %></strong>
+                                <span><%= p.dropPendientes %> artículos · <%= p.dropLinks %> links</span>
+                            </div>
+                            <div class="tag-merge-metric tag-merge-metric-keep">
+                                <span class="tag-merge-metric-label">Etiqueta resultante</span>
+                                <strong><%= p.keepTag %></strong>
+                                <span><%= p.keepPendientes %> artículos · <%= p.keepLinks %> links</span>
+                            </div>
+                        </div>
+
+                        <div class="tag-merge-actions">
+                            <button
+                                type="button"
+                                class="admin-btn btn-save js-merge-action"
+                                data-id="<%= p._id %>"
+                                data-action="approve"
+                                title="Aplicar la fusión y conservar la etiqueta resultante">
+                                Aprobar fusión
+                            </button>
+                            <button
+                                type="button"
+                                class="admin-btn btn-danger js-merge-action"
+                                data-id="<%= p._id %>"
+                                data-action="reject"
+                                title="Descartar esta propuesta sin tocar los documentos">
+                                Rechazar
+                            </button>
+                        </div>
+                    </article>
+                <% }) %>
+            </div>
+        </section>
+
+        <aside class="admin-panel tag-merge-panel tag-merge-panel-secondary">
+            <div class="admin-panel-header tag-merge-panel-header">
+                <div>
+                    <h2>Actividad reciente</h2>
+                    <p>Historial de las últimas propuestas aprobadas o descartadas.</p>
+                </div>
+            </div>
+
+            <% if (recent.length === 0) { %>
+                <div class="tag-merge-empty tag-merge-empty-compact">
+                    <strong>Sin historial todavía.</strong>
+                    <p>Cuando revises propuestas, aparecerán aquí con su estado y responsable.</p>
+                </div>
+            <% } else { %>
+                <div class="tag-merge-history-list">
+                    <% recent.forEach(function(p) { %>
+                        <article class="tag-merge-history-card tag-merge-history-card-<%= p.status %>">
+                            <div class="tag-merge-history-top">
+                                <span class="tag-merge-status <%= p.status === 'approved' ? 'tag-merge-status-approved' : 'tag-merge-status-rejected' %>">
+                                    <%= p.status === 'approved' ? 'Aprobada' : 'Rechazada' %>
+                                </span>
+                                <span class="tag-merge-history-date"><%= new Date(p.resolvedAt).toLocaleDateString('es-ES') %></span>
+                            </div>
+
+                            <div class="tag-merge-flow tag-merge-flow-compact">
+                                <span class="tag-merge-chip tag-merge-chip-drop"><%= p.dropTag %></span>
+                                <span class="tag-merge-flow-arrow">→</span>
+                                <span class="tag-merge-chip tag-merge-chip-keep"><%= p.keepTag %></span>
+                            </div>
+
+                            <p class="tag-merge-history-meta">
+                                <% if (p.resolvedBy) { %>
+                                    Revisada por <strong><%= p.resolvedBy %></strong>
+                                <% } else { %>
+                                    Revisada manualmente
+                                <% } %>
+                            </p>
+                        </article>
+                    <% }) %>
+                </div>
+            <% } %>
+        </aside>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const feedback = document.getElementById('feedback-msg');
+    const pendingList = document.getElementById('pending-list');
+    const pendingEmpty = document.getElementById('pending-empty');
+    const pendingCount = document.getElementById('pending-count');
+
+    document.querySelectorAll('.js-merge-action').forEach(function (button) {
+        button.addEventListener('click', async function () {
+            const proposalId = button.dataset.id;
+            const action = button.dataset.action;
+            const card = document.getElementById('proposal-' + proposalId);
+            const cardButtons = card ? card.querySelectorAll('.js-merge-action') : [];
+
+            cardButtons.forEach(function (item) {
+                item.disabled = true;
+            });
+
+            try {
+                const response = await fetch('/admin/tag-merges/' + proposalId + '/' + action, { method: 'POST' });
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Error desconocido');
+                }
+
+                if (card) {
+                    card.remove();
+                }
+
+                const nextCount = Math.max(0, Number(pendingCount.textContent || '0') - 1);
+                pendingCount.textContent = String(nextCount);
+
+                if (nextCount === 0) {
+                    pendingList.hidden = true;
+                    pendingEmpty.hidden = false;
+                }
+
+                showFeedback(data.message, action === 'approve' ? 'success' : 'info');
+            } catch (error) {
+                cardButtons.forEach(function (item) {
+                    item.disabled = false;
+                });
+                showFeedback(error.message, 'error');
+            }
+        });
+    });
+
+    function showFeedback(message, type) {
+        if (!feedback) return;
+        feedback.textContent = message;
+        feedback.className = 'admin-alert tag-merge-feedback';
+
+        if (type === 'success') {
+            feedback.classList.add('admin-alert-success');
+        } else if (type === 'error') {
+            feedback.classList.add('admin-alert-error');
+        } else {
+            feedback.classList.add('tag-merge-feedback-info');
+        }
+
+        feedback.hidden = false;
+        clearTimeout(feedback._timer);
+        feedback._timer = setTimeout(function () {
+            feedback.hidden = true;
+        }, 4000);
+    }
+});
+</script>
+</body>
+</html>

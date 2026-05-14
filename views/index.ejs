@@ -93,13 +93,19 @@
                     </div>
                 <% } %>
                 <% if (currentTag) { %>
+                    <% currentTag.split(',').map(t => t.trim()).filter(Boolean).forEach(function(singleTag) { %>
                     <div class="active-filter-top">
-                        <span class="filter-text">Etiqueta: <%= currentTag %></span>
+                        <span class="filter-text">Etiqueta: <%= singleTag %></span>
+                        <% 
+                        const remainingTags = currentTag.split(',').map(t => t.trim()).filter(t => t && t !== singleTag).join(',');
+                        %>
                         <a href="/?<%= 
+                            (remainingTags ? 'tag=' + encodeURIComponent(remainingTags) + '&' : '') +
                             (currentSearch ? 'search=' + encodeURIComponent(currentSearch) : '') + 
-                            (currentCategoria ? (currentSearch ? '&' : '') + 'categoria=' + currentCategoria : '')
+                            (currentCategoria ? (currentSearch || remainingTags ? '&' : '') + 'categoria=' + currentCategoria : '')
                         %>" class="remove-filter-top">×</a>
                     </div>
+                    <% }); %>
                 <% } %>
                 <a href="/" class="clear-all-filters">Limpiar todos</a>
             </div>
@@ -112,20 +118,27 @@
                 <!-- Barra de búsqueda compacta -->
                 <div class="search-compact">
                     <form method="GET" action="/" class="search-form">
+                        <!-- Chips de etiquetas seleccionadas (gestionadas por JS) -->
+                        <div id="selectedTagsChips" class="selected-tags-chips"></div>
+
                         <div class="search-box">
-                            <input 
-                                type="text" 
-                                name="search" 
-                                placeholder="Buscar en todos los campos (título, contenido, URL, etiquetas)..."
-                                value="<%= currentSearch %>"
-                                class="search-input"
-                            >
-                            <button type="submit" class="search-btn">🔍</button>
+                            <div class="search-input-wrap">
+                                <input 
+                                    type="text" 
+                                    name="search" 
+                                    placeholder="Escribe para buscar o añadir etiquetas..."
+                                    value="<%= currentSearch %>"
+                                    class="search-input"
+                                    autocomplete="off"
+                                    aria-autocomplete="list"
+                                    aria-controls="tagSuggest"
+                                >
+                                <div id="tagSuggest" class="tag-suggest-dropdown" role="listbox" hidden></div>
+                            </div>
+                            <button type="submit" class="search-btn">🔍 Buscar</button>
                             
-                            <!-- MANTENER los parámetros existentes como hidden inputs -->
-                            <% if (currentTag) { %>
-                                <input type="hidden" name="tag" value="<%= currentTag %>">
-                            <% } %>
+                            <!-- Tag input gestionado por JS -->
+                            <input type="hidden" name="tag" id="selectedTagsInput" value="<%= currentTag %>">
                             <% if (currentCategoria) { %>
                                 <input type="hidden" name="categoria" value="<%= currentCategoria %>">
                             <% } %>
@@ -137,36 +150,24 @@
                             <% } %>
                         </div>
                         
-                        <!-- Indicador de filtros activos debajo del buscador -->
-                        <% if (currentTag || currentCategoria) { %>
+                        <!-- Indicador de filtros activos: solo categoría (las etiquetas se muestran como chips) -->
+                        <% if (currentCategoria) { %>
                             <div class="active-filters-inline">
                                 <span class="filter-label">🔖 Filtrando por:</span>
-                                <% if (currentTag) { %>
-                                    <span class="filter-badge">
-                                        <span class="filter-icon">🏷️</span>
-                                        <%= currentTag %>
-                                        <a href="/?<%= 
-                                            (currentSearch ? 'search=' + encodeURIComponent(currentSearch) : '') + 
-                                            (currentCategoria ? (currentSearch ? '&' : '') + 'categoria=' + currentCategoria : '')
-                                        %>" class="filter-remove" title="Quitar filtro">×</a>
-                                    </span>
-                                <% } %>
-                                <% if (currentCategoria) { %>
-                                    <span class="filter-badge">
-                                        <span class="filter-icon">📂</span>
-                                        <% 
-                                        let categoriaNombre = 'Categoría';
-                                        categorias.forEach(([key, cat]) => {
-                                            if (key === currentCategoria) categoriaNombre = cat.name;
-                                        });
-                                        %>
-                                        <%= categoriaNombre %>
-                                        <a href="/?<%= 
-                                            (currentSearch ? 'search=' + encodeURIComponent(currentSearch) : '') + 
-                                            (currentTag ? (currentSearch ? '&' : '') + 'tag=' + encodeURIComponent(currentTag) : '')
-                                        %>" class="filter-remove" title="Quitar filtro">×</a>
-                                    </span>
-                                <% } %>
+                                <span class="filter-badge">
+                                    <span class="filter-icon">📂</span>
+                                    <% 
+                                    let categoriaNombreInline = 'Categoría';
+                                    categorias.forEach(([key, cat]) => {
+                                        if (key === currentCategoria) categoriaNombreInline = cat.name;
+                                    });
+                                    %>
+                                    <%= categoriaNombreInline %>
+                                    <a href="/?<%= 
+                                        (currentSearch ? 'search=' + encodeURIComponent(currentSearch) : '') + 
+                                        (currentTag ? (currentSearch ? '&' : '') + 'tag=' + encodeURIComponent(currentTag) : '')
+                                    %>" class="filter-remove" title="Quitar filtro">×</a>
+                                </span>
                             </div>
                         <% } %>
                         
@@ -404,7 +405,8 @@
                                         (currentCategoria ? '&categoria=' + currentCategoria : '') +
                                         (currentPage > 1 ? '&page=' + currentPage : '')
                                     %>" 
-                                    class="tag-bubble <%= currentTag === tag.name ? 'active' : '' %>"
+                                    class="tag-bubble <%= currentTag && currentTag.split(',').map(t => t.trim()).includes(tag.name) ? 'active' : '' %>"
+                                    data-tag-name="<%= tag.name %>"
                                     data-count="<%= tag.count %>"
                                     title="Aparece en <%= tag.count %> artículo(s)"
                                 >

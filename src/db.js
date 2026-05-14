@@ -8,6 +8,7 @@ let db;
 let collection;
 let usersCollection;
 let linksCollection;
+let proposalsCollection;
 
 async function connectDB() {
     const client = new MongoClient(mongoUrl);
@@ -16,6 +17,7 @@ async function connectDB() {
     collection = db.collection(collectionName);
     usersCollection = db.collection('users');
     linksCollection = db.collection('links');
+    proposalsCollection = db.collection('tag_merge_proposals');
 
     await collection.createIndex(
         { title: 'text', content: 'text', url: 'text', tags: 'text' }
@@ -38,6 +40,7 @@ function getDB() { return db; }
 function getCollection() { return collection; }
 function getUsersCollection() { return usersCollection; }
 function getLinksCollection() { return linksCollection; }
+function getProposalsCollection() { return proposalsCollection; }
 
 module.exports = {
     connectDB,
@@ -45,4 +48,5 @@ module.exports = {
     getCollection,
     getUsersCollection,
     getLinksCollection,
+    getProposalsCollection,
 };

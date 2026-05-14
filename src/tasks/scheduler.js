@@ -1,8 +1,16 @@
 const cron = require('node-cron');
+const fs = require('fs');
+const path = require('path');
 const { runDuplicateReport } = require('./duplicateReport');
 const { runUntaggedReport } = require('./untaggedReport');
 const { runScrapeAnalyze } = require('./scrapeAnalyze');
+const { runTagMergeProposals } = require('./tagMerge');
 const { appLogger, createTaskLogger } = require('../logger');
+
+const CUSTOM_TASKS_DIR = path.join(__dirname, 'custom');
+
+// Map of active cron job handles keyed by task id, used to stop dynamic tasks
+const _cronHandles = {};
 
 const TASK_REGISTRY = {
     duplicateUrls: {
@@ -53,6 +61,22 @@ const TASK_REGISTRY = {
             return result;
         },
     },
+    tagMergeProposals: {
+        id: 'tagMergeProposals',
+        name: 'Propuestas de fusión de etiquetas',
+        description: 'Analiza las etiquetas de "pendientes" y "links", detecta pares similares (plurales, variantes ortográficas) y crea propuestas en la BD. Notifica por Telegram y espera aprobación manual en Admin → Fusión de etiquetas.',
+        schedule: '0 12 * * 0',
+        scheduleLabel: 'Domingos a las 12:00',
+        timezone: 'Europe/Madrid',
+        lastRun: null,
+        lastStatus: null,
+        lastMessage: null,
+        lastResult: null,
+        run: async () => {
+            const result = await runTagMergeProposals();
+            return result;
+        },
+    },
 };
 
 function summarizeTaskResult(taskId, result) {
@@ -70,6 +94,10 @@ function summarizeTaskResult(taskId, result) {
 
     if (taskId === 'scrapeAnalyze') {
         return `${result.analyzed || 0}/${result.total || 0} analizados, ${result.errors || 0} error(es)`;
+    }
+
+    if (taskId === 'tagMergeProposals') {
+        return `${result.newProposals || 0} nueva(s) propuesta(s), ${result.totalPending || 0} pendiente(s) de revisión`;
     }
 
     return 'Completada correctamente';
@@ -104,6 +132,9 @@ async function executeTask(task) {
 }
 
 function initScheduler() {
+    // Load persisted dynamic tasks first
+    loadCustomTasks();
+
     for (const task of Object.values(TASK_REGISTRY)) {
         cron.schedule(task.schedule, async () => {
             appLogger.info(`⏰ Cron disparado: ${task.name}`);
@@ -142,4 +173,94 @@ async function runTaskById(id) {
     await executeTask(task);
 }
 
-module.exports = { initScheduler, getTaskRegistry, runTaskById, updateTaskState };
+/**
+ * Register a dynamic task from a plain JS script string.
+ * The script must export a function via module.exports = async function run() { ... }
+ * Returns the registered task object.
+ */
+function registerDynamicTask({ id, name, description, schedule, scheduleLabel, timezone, scriptBody }) {
+    if (!cron.validate(schedule)) {
+        throw new Error(`Expresión cron inválida: "${schedule}"`);
+    }
+
+    // Safely build a run function by writing to a temp module and require-ing it
+    fs.mkdirSync(CUSTOM_TASKS_DIR, { recursive: true });
+    const scriptPath = path.join(CUSTOM_TASKS_DIR, `${id}.js`);
+
+    // Wrap the user body so it always returns something
+    const wrappedScript = `// Auto-generated dynamic task: ${id}\nmodule.exports = async function run() {\n${scriptBody}\n};\n`;
+    fs.writeFileSync(scriptPath, wrappedScript, 'utf8');
+
+    // Persist task metadata alongside the script
+    const metaPath = path.join(CUSTOM_TASKS_DIR, `${id}.meta.json`);
+    fs.writeFileSync(metaPath, JSON.stringify({ id, name, description, schedule, scheduleLabel, timezone }, null, 2), 'utf8');
+
+    // If a previous version exists, stop it
+    unregisterTask(id);
+
+    // Load the freshly written module (delete from cache first so re-register picks up changes)
+    delete require.cache[require.resolve(scriptPath)];
+    const runFn = require(scriptPath);
+
+    const task = {
+        id,
+        name,
+        description,
+        schedule,
+        scheduleLabel,
+        timezone: timezone || 'Europe/Madrid',
+        lastRun: null,
+        lastStatus: null,
+        lastMessage: null,
+        lastResult: null,
+        dynamic: true,
+        run: runFn,
+    };
+
+    TASK_REGISTRY[id] = task;
+
+    _cronHandles[id] = cron.schedule(schedule, async () => {
+        appLogger.info(`⏰ Cron disparado (dinámico): ${task.name}`);
+        await executeTask(task);
+    }, { timezone: task.timezone });
+
+    appLogger.info(`✅ Tarea dinámica registrada: ${id} (${scheduleLabel})`);
+    return task;
+}
+
+/**
+ * Stop and remove a task from the registry and cron scheduler.
+ * Does NOT delete the persisted script file; use deleteDynamicTask for that.
+ */
+function unregisterTask(id) {
+    if (_cronHandles[id]) {
+        try { _cronHandles[id].stop(); } catch (_) {}
+        delete _cronHandles[id];
+    }
+    delete TASK_REGISTRY[id];
+}
+
+/**
+ * Load all persisted dynamic tasks from src/tasks/custom/ at startup.
+ */
+function loadCustomTasks() {
+    if (!fs.existsSync(CUSTOM_TASKS_DIR)) return;
+    const files = fs.readdirSync(CUSTOM_TASKS_DIR).filter((f) => f.endsWith('.meta.json'));
+    for (const file of files) {
+        try {
+            const meta = JSON.parse(fs.readFileSync(path.join(CUSTOM_TASKS_DIR, file), 'utf8'));
+            const scriptPath = path.join(CUSTOM_TASKS_DIR, `${meta.id}.js`);
+            if (!fs.existsSync(scriptPath)) continue;
+            const scriptBody = fs.readFileSync(scriptPath, 'utf8')
+                .replace(/^\/\/ Auto-generated.*\n/, '')
+                .replace(/^module\.exports = async function run\(\) \{\n/, '')
+                .replace(/\};\n?$/, '');
+            registerDynamicTask({ ...meta, scriptBody });
+            appLogger.info(`🚀 Tarea dinámica restaurada: ${meta.id}`);
+        } catch (err) {
+            appLogger.error(`❌ No se pudo cargar tarea dinámica "${file}": ${err.message}`);
+        }
+    }
+}
+
+module.exports = { initScheduler, getTaskRegistry, runTaskById, updateTaskState, registerDynamicTask, unregisterTask, loadCustomTasks };

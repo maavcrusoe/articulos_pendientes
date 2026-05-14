@@ -16,6 +16,7 @@ Usa `nodemon` para reinicio automático ante cambios en ficheros `.js` y `.ejs`.
 | `/api/search`, `/api/articulo/:id/view` | `src/routes/api.js` | Público |
 | `/admin/login`, `/admin/register`, `/admin/logout` | `src/routes/auth.js` | Público |
 | `/admin` | `src/routes/admin.js` | `requireAdmin` |
+| `/admin/tag-merges`, `/admin/tag-merges/:id/approve`, `/admin/tag-merges/:id/reject` | `src/routes/admin.js` | `requireAdmin` |
 | `/notion-pending`, `/notion-table` | `src/routes/notion.js` | `requireAdmin` |
 
 ## Añadir una nueva ruta
